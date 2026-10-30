@@ -1,0 +1,289 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Record data and view it in Foxglove
+
+<Note>
+Record the outputs of Holoscan operators to an MCAP file and inspect them in Foxglove, either
+from the finished file or live while the app runs. To feed a recording back into a graph, see
+[Replay a recording into a graph](/isaac-os/how-to/replay-a-recording-into-a-graph).
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Record data and view it in Foxglove" hidePrompt actions={["cursor"]}>
+Find the graph or recording, the topics, and if I want live or recorded inspection
+in our conversation and project. Ask me for missing details.
+Follow [Record data and view it in Foxglove](/isaac-os/how-to/record-and-inspect-data-with-mcap-and-foxglove).
+Verify that the selected topics show in Foxglove. If you make a recording, verify
+that the file is finalized.
+</Prompt>
+</llms-ignore>
+
+## Before you start
+
+- You have a C++ Holoscan graph, with the `isaac::common::mcap_logger` library available to your
+  build. Inside the Isaac OS repository, [Build and run](/isaac-os/how-to/build-and-run) covers
+  this. From your own project, see
+  [Integrate in your project](/isaac-os/how-to/integrate-in-your-project).
+- [Foxglove](https://foxglove.dev/) on a machine that can show a window. It need not be the
+  machine that runs the app.
+
+The steps below are taken from the runnable
+[MCAP logger reference](/isaac-os/reference/applications/mcap-logger-reference).
+
+## Record a graph's outputs to a file
+
+### Create the logger
+
+`output_path` is a directory. The logger names the file `mcap_log_<local-timestamp>.mcap`
+inside it, so a second run does not overwrite the first:
+
+```cpp
+using isaac::os::mcap_logger::HsdkMcapLogger;
+using isaac::os::mcap_logger::HsdkMcapLoggerOptions;
+
+HsdkMcapLogger logger(HsdkMcapLoggerOptions{.output_path = "/data"});
+```
+
+### Attach outputs to topics
+
+Give your graph a reference to the logger:
+
+```cpp
+class MyGraph final : public holoscan::Graph {
+ public:
+  explicit MyGraph(isaac::os::mcap_logger::HsdkMcapLogger& logger)
+      : Graph("my_graph"), logger_(logger) {}
+
+ private:
+  isaac::os::mcap_logger::HsdkMcapLogger& logger_;
+};
+```
+
+In `compose()`, declare a default clock, which `compile()` requires, then call `attach<T>()`
+once per output you want recorded. The string is the topic name in the file, and each name can
+be attached once:
+
+```cpp
+void compose() override {
+  set_default_clock(add_clock<holoscan::RealtimeClock>("clock"));
+
+  auto my_op = op<MyOperator>("my_op");
+  logger_.attach<isaac::JointCommandCpuT>(*this, "joint_command", my_op->joint_command_out);
+}
+```
+
+### Compile, start the logger, then run
+
+Compile the graph, start the logger with the plan's endpoint catalog, then run the graph:
+
+```cpp
+MyGraph graph(logger);
+const holoscan::ExecutionPlan plan = holoscan::compile(graph);
+if (!plan.ok()) { /* log plan.diagnostics() */ return 1; }
+
+logger.start(plan.endpoint_catalog());
+holoscan::RunSession run_session = holoscan::run_async(plan);
+```
+
+### Stop the graph, then finalize the file
+
+```cpp
+run_session.request_stop();
+run_session.wait();
+logger.shutdown();  // the destructor also does this
+```
+
+Call `shutdown()` explicitly if you need the file complete before the logger goes out of scope.
+
+### Check the recording
+
+Run your app. The file is in the directory you passed as `output_path`, named
+`mcap_log_<local-timestamp>.mcap`.
+
+<Accordion title="Try it with the reference app">
+
+Record five seconds of data with the reference app:
+
+```bash
+./isaac_os run mcap_logger_reference -- --duration-s=5
+```
+
+On exit, the app logs the absolute container path. The default directory, `mcap_logger_output/`,
+is bind-mounted under the host repository root:
+
+```text
+Wrote "/workspace/isaac_os/mcap_logger_output/mcap_log_20261008_211419.mcap"
+```
+
+For persistent custom output, set `--output-path` to a bind-mounted container directory.
+
+</Accordion>
+
+## View a recording in Foxglove
+
+1. Open Foxglove and choose **Open local file**, then select the `.mcap` file.
+2. Add a **Raw Messages** panel and pick a topic to inspect its fields. Add a **Plot** panel
+   and use a message path to chart a value, in the form `/<topic>.<field>[<index>]`.
+
+The topic list shows the names you passed to `attach<T>()`. The reference app's recording has
+`sine_joint_state`, so there you can plot `/sine_joint_state.position[0]`. Those topics exist
+only in a recording made with the reference app; use a topic from your own recording otherwise.
+
+Every topic the logger writes opens this way with no setup. Native panels, such as a pose
+arrow in a **3D** panel or an **Image** panel on a raw image topic, need the converter
+extension in the next section.
+
+## Install the converter extension for native panels
+
+Install the extension if you want native panels for poses, twists, transforms, camera
+calibration or raw images. From a checkout of the Isaac OS repository, build the `.foxe`
+package:
+
+```bash
+cd tools/foxglove/isaac-to-foxglove-converter
+npm ci
+npm run package
+```
+
+`npm run package` writes `nvidia.isaac-to-foxglove-converter-<version>.foxe` in that
+directory. Load it into Foxglove: open the **Extensions** panel, choose **Install extension from
+file**, and select the package, or drag it onto the Foxglove window.
+
+The extension's
+[README](../../tools/foxglove/isaac-to-foxglove-converter/README.md)
+lists the exact conversions it supports.
+
+
+## Stream live while the app runs
+
+In your Holoscan application, pass `.enable_stream = true` on the `HsdkMcapLogger` to send every
+attached topic to Foxglove while the app runs. Add `.enable_write_file = false` to stream without
+writing a file. At least one of the two must be on:
+
+```cpp
+HsdkMcapLogger logger(HsdkMcapLoggerOptions{
+    .output_path = "/data", .enable_stream = true});
+```
+
+The Isaac OS process hosts a WebSocket server, and Foxglove connects to it as a client. The
+server listens on `127.0.0.1:8765` unless you set `websocket_host` and `websocket_port` in
+`HsdkMcapLoggerOptions`. The reference app exposes streaming as `--stream`, skips the file with
+`--no-file`, and sets the address with `--websocket-host` and `--websocket-port`:
+
+```bash
+./isaac_os run mcap_logger_reference -- --duration-s=30 --stream
+```
+
+The reference app's container shares the host network, so the server is on the host's loopback.
+If Foxglove runs on another machine, forward the port, then connect Foxglove to
+`ws://localhost:8765`:
+
+```bash
+ssh -L 8765:localhost:8765 <user>@<host>
+```
+
+The server authenticates no client and encrypts nothing. Keep the default loopback address
+unless you have read the Foxglove live streaming section of `SECURITY.md`; binding
+`websocket_host` to `0.0.0.0` lets anyone who can reach the port read every topic.
+
+<Note>
+The last few seconds of a run may not reach a connected Foxglove client. Rely on the file if you
+need every sample.
+</Note>
+
+## Record camera images
+
+Image topics use the tensor-schema `attach<T>()` overload, which takes a contract bounding
+the frame size. `ImageTensorFieldContract` computes the bound from the frame dimensions:
+
+```cpp
+#include "common/image_schema/image_schema.h"
+
+logger_.attach<holoscan::schema::ImageT>(
+    *this, "camera", camera->image_out,
+    isaac::os::image_schema::ImageTensorFieldContract(
+        1920, 1080, holoscan::schema::ImageEncoding_RGB8));
+```
+
+A raw image topic is recorded as a generic flatbuffer, so Foxglove needs the converter extension
+to show it in an **Image** panel.
+
+To record the topic as GPU-encoded video instead of raw frames, set `encode` in `TopicLogOptions`
+and pass it to `attach<T>()`. `cuda_device` in `VideoEncodeOptions` selects the GPU and defaults
+to 0. Without `encode`, the topic is recorded as raw frames:
+
+```cpp
+logger_.attach<holoscan::schema::ImageT>(
+    *this, "camera", camera->image_out,
+    isaac::os::image_schema::ImageTensorFieldContract(
+        1920, 1080, holoscan::schema::ImageEncoding_RGB8),
+    isaac::os::mcap_logger::TopicLogOptions{
+        .encode = isaac::os::mcap_logger::VideoEncodeOptions{.cuda_device = 0}});
+```
+
+<Note>
+- Foxglove shows an encoded topic in an **Image** panel without the converter extension.
+- An encoded topic writes two channels: the video and a `<topic>/metadata` sidecar.
+- Raw and encoded recordings differ in size and fidelity. The
+  [MCAP logger reference](/isaac-os/reference/applications/mcap-logger-reference) compares them.
+</Note>
+
+<Warning>
+If the selected GPU has no NVENC encoder, `start()` throws an exception naming the topic and
+device, and does not record raw frames in its place. To record raw frames, attach without `encode`.
+If your app should encode when it can and record raw frames otherwise, check
+`FrameEncoder::hardware_available(cuda_device, codec)` first, as the reference app does.
+</Warning>
+
+<Accordion title="Adjust file compression">
+
+Large data topics can dominate the recording size and affect throughput.
+
+- **Encode images as video.** Set `encode` on the image topic, as above.
+- **Choose the file's compression.** Set `compression` on the logger:
+
+  ```cpp
+  HsdkMcapLogger logger(HsdkMcapLoggerOptions{
+      .output_path = "/data", .compression = foxglove::McapCompression::None});
+  ```
+
+  `Lz4`, the default, makes the file smaller at little CPU cost. `None` writes fastest and makes
+  the largest file, so use it when the disk's speed and space allow. `Zstd` makes the smallest
+  file, but compresses large topics slowly and may lead to topics being dropped.
+
+</Accordion>
+
+## If the recording is not what you expect
+
+<Accordion title="⚠️ A topic is missing from the file">
+
+The logger records only outputs you attached with `attach<T>()`, and `attach` throws if the same
+topic name is used twice.
+
+</Accordion>
+
+<Accordion title="⚠️ The file is empty or unreadable">
+
+The logger was not shut down. Call `logger.shutdown()` after the graph stops, or let the logger
+go out of scope.
+
+</Accordion>
+
+<Accordion title="⚠️ A topic drops samples">
+
+Its poll thread could not keep up and its queue filled, so the oldest samples were dropped. The
+logger logs a warning naming the topic. Raising `queue_depth` in that topic's `TopicLogOptions` or
+changing file compression may help; see "Adjust file compression".
+
+</Accordion>
+
+## Related
+
+- [Library README](../../common/mcap_logger/README.md):
+  every option, error behavior and the on-disk format.
+
+- [MCAP logger reference](/isaac-os/reference/applications/mcap-logger-reference): the runnable
+  app, its topics and a Foxglove panel layout.

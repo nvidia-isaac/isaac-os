@@ -1,0 +1,19 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+include "geometry.fbs";
+include "header.fbs";
+
+namespace isaac;
+
+// A linear + angular velocity built from CPU-resident holoscan.schema geometry primitives.
+// header is optional: geometry_msgs/Twist carries none, geometry_msgs/TwistStamped supplies
+// one -- both ROS2 types convert to/from this one table.
+table TwistCpu {
+  linear: holoscan.schema.Vector3d (id: 0, required, native_inline);
+  angular: holoscan.schema.Vector3d (id: 1, required, native_inline);
+  header: holoscan.schema.Header (id: 2);
+}
+
+root_type TwistCpu;
+file_identifier "ISTW";

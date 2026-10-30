@@ -1,0 +1,19 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+include "geometry.fbs";
+include "header.fbs";
+
+namespace isaac;
+
+// A 3D pose (position + orientation) built from CPU-resident holoscan.schema geometry
+// primitives. header is optional: geometry_msgs/Pose carries none, geometry_msgs/PoseStamped
+// supplies one -- both ROS2 types convert to/from this one table.
+table PoseCpu {
+  position: holoscan.schema.Vector3d (id: 0, required, native_inline);
+  orientation: holoscan.schema.Quaterniond (id: 1, required, native_inline);
+  header: holoscan.schema.Header (id: 2);
+}
+
+root_type PoseCpu;
+file_identifier "ISPO";

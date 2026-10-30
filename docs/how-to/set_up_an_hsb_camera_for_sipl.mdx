@@ -1,0 +1,195 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Set up an HSB camera for SIPL
+
+<Note>
+This guide prepares a Holoscan Sensor Bridge (HSB) camera for an Isaac OS application that captures
+through NVIDIA SIPL.
+</Note>
+
+## Supported reference setup
+
+<Warning title="Known limitations">
+
+SIPL support for this camera setup is still in early development and has known limitations.
+The tested JetPack version does not imply that all capture and stereo issues are resolved.
+Check the application's README for known issues affecting its capture mode.
+</Warning>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Set up an HSB camera" hidePrompt actions={["cursor"]}>
+Find my camera model, host and installed software in our conversation and
+project. Ask me for missing details.
+Before you change the configuration, compare them with the supported setup in
+[Set up an HSB camera for SIPL](/isaac-os/how-to/set-up-an-hsb-camera-for-sipl).
+For a different camera, first get its SIPL description and driver as the guide
+specifies. Then configure the transport and camera, and verify frame capture.
+</Prompt>
+</llms-ignore>
+
+Isaac OS currently provides and tests HSB/SIPL platform descriptions for the
+[Leopard Eagle VB1940 camera](https://leopardimaging.com/product-category/depth-sensing/stereoscopic-cameras/li-vb1940-stxxx-10gige/)
+on Jetson AGX Thor. JetPack 7.2.1 (Jetson Linux BSP R39.2.1) is the currently tested and supported
+version for this setup. JetPack provides the camera's reference Unified Device Driver Framework
+(UDDF) driver.
+
+<Note title="Using another camera">
+
+Another HSB camera needs:
+
+1. A SIPL `SensorSystemConfig` JSON description for its camera and transport.
+2. A compatible UDDF driver installed where SIPL can discover it. Driver names and the names in the
+   JSON description must match.
+
+See NVIDIA's [HSB UDDF driver guide](https://docs.nvidia.com/holoscan/sensor-bridge/applications/uddf-drivers)
+and [Jetson CoE camera development guide](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/CameraDevelopment/SIPLFramework/SIPL-for-L4T/CoE/CoECameraDevelopment.html)
+for the driver model and integration workflow.
+
+Custom UDDF drivers must also match the installed SIPL release. In particular, JetPack 7.2 changed
+UDDF interface UUIDs, so drivers built against JetPack 7.1 must be rebuilt with 7.2 headers. See
+[UDDF integration](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/CameraDevelopment/SIPLFramework/SIPL-for-L4T/UDDF/sipl_integration.html).
+</Note>
+
+## Prepare the host software
+
+Run the setup commands on the Thor host, outside the application container.
+
+### Check and update the BSP
+
+Check the installed BSP and, if an upgrade is needed, the available package:
+
+```bash
+cat /etc/nv_tegra_release
+dpkg-query -W nvidia-l4t-bsp-openrm
+```
+
+The target is `R39`, `REVISION: 2.1`, and package version `39.2.1-...`. If already installed,
+continue to the development headers section below. Otherwise, for a host on an older JetPack 7
+version, upgrade and reboot:
+
+```bash
+sudo apt update
+apt-cache policy nvidia-l4t-bsp-openrm
+sudo apt upgrade nvidia-l4t-bsp-openrm
+sudo reboot
+```
+
+`apt upgrade` also upgrades other pending system packages. To target the BSP package and its
+dependencies, use `sudo apt install --only-upgrade nvidia-l4t-bsp-openrm` instead, then reboot.
+
+After reboot, repeat the installed-version checks. If the candidate does not match the target,
+follow the
+[JetPack installation instructions](https://developer.nvidia.com/embedded/jetpack/downloads)
+for that release first. Updating the BSP does not install every component of the JetPack SDK.
+
+### Install matching SIPL development headers
+
+The BSP upgrade does **not** install or update the SIPL development headers. SDK Manager can install
+them as an optional component; ISO and OTA installations may require the separate API archive.
+Check whether the capture header is present:
+
+```bash
+ls -l /usr/src/jetson_sipl_api/sipl/include/NvSIPLCamera.hpp
+```
+
+If the headers are missing or from an earlier release, install the SIPL API archive for the
+**installed BSP release**. A header's presence alone does not establish its version; if unsure,
+reinstall from the matching archive. For BSP `39.2.1-...`, use:
+
+```bash
+mkdir -p ~/.cache/isaac_os/downloads
+cd ~/.cache/isaac_os/downloads
+wget https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/release/Jetson_SIPL_API_R39.2.1_aarch64.tbz2
+tar tjf Jetson_SIPL_API_R39.2.1_aarch64.tbz2
+sudo tar xjf Jetson_SIPL_API_R39.2.1_aarch64.tbz2 -C /
+ls -l /usr/src/jetson_sipl_api/sipl/include/NvSIPLCamera.hpp
+```
+
+The `.tbz2` archive installs headers and samples under `/usr/src/jetson_sipl_api`. The **Camera SIPL**
+downloads on [JetPack downloads](https://developer.nvidia.com/embedded/jetpack/downloads) and its
+release archives are BSP-specific: R39.2.0 and R39.2.1 are separate downloads.
+
+## Connect HSB and configure the network
+
+1. Follow the NVIDIA HSB [hardware setup](https://docs.nvidia.com/holoscan/sensor-bridge/getting-started/hardware-setup)
+   to connect and power the board.
+2. Follow the NVIDIA HSB [host setup](https://docs.nvidia.com/holoscan/sensor-bridge/getting-started/host-setup)
+   for AGX Thor to configure the network and PTP clock synchronization. The HSB
+   checkout, build, and example steps are not required for this Isaac OS path.
+
+The shared platform descriptions use the default HSB address `192.168.0.2`. If the board uses
+another address, configure the host interface for it and update the JSON in the camera
+configuration section below.
+
+### PTP clock synchronization
+
+Holoscan Camera 1.0.0 requires host PTP for HSB capture in every mode, including single-camera
+and unsynchronized stereo. Follow the upstream host setup to run `phc2sys` with the host's
+`CLOCK_REALTIME` as its source and offset `-O 0`, and `ptp4l` as the transmitting master. Keep both
+running throughout capture and avoid stepping the host clock during a run.
+
+The JetPack 7.2.1 UDDF driver enables HSB's PTP support automatically. The capture operator
+skips frames whose HSB timestamp is missing, invalid, or more than one second from host time.
+The next published frame is marked degraded. Capture fails if timestamps remain unusable for
+30 seconds; a stalled stream can fail sooner on the frame-wait timeout. After a board reset,
+that 30-second window gives HSB time to reach the host epoch.
+
+<Accordion title="⚠️ Known issue with PTP and synchronized stereo capture">
+
+HSB can reset during camera startup and acquire PTP synchronization after streaming begins,
+causing a large clock jump. Intermittent capture timeouts and failures have been reported around
+this transition. The issue is still under investigation; a clock jump does not always cause a
+failure, and stopping PTP does not resolve every possible stereo capture issue.
+
+Stopping PTP prevents Holoscan Camera 1.0.0 from capturing HSB frames. For previewing two
+cameras without VSYNC, use the application's `stereo_nosync` mode while keeping PTP running.
+
+</Accordion>
+
+## Configure the camera
+
+Choose the appropriate shared platform description:
+
+- `common/sipl/config/vb1940_single.json` for one sensor
+- `common/sipl/config/vb1940_stereo.json` for synchronized sensors
+- `common/sipl/config/vb1940_stereo_nosync.json` for two unsynchronized sensors
+
+In the selected file, replace every `ip_address` value if the board does not use `192.168.0.2`.
+
+For a stereo description, both sensor entries normally identify the same HSB device, so update both
+`ip_address` occurrences.
+
+<Accordion title="❓ Why is the MAC address set to zero?">
+The current SIPL HSB transport finds the board using `ip_address`, so capture does not require
+`mac_address` to match the board. The field must still contain a syntactically valid MAC address.
+The shared descriptions therefore use `00:00:00:00:00:00` as a neutral default.
+
+Using the board's actual address is optional for capture, but makes the description accurately
+identify the hardware. To record it, ping the board and read the value after `lladdr`, then replace
+every `mac_address` occurrence in the selected description:
+
+```bash
+ping -c 1 192.168.0.2
+ip neigh show 192.168.0.2
+```
+
+</Accordion>
+
+<Tip>
+If the board's IP is unknown, use `hololink-enumerate` from the
+[Holoscan Sensor Bridge repository](https://github.com/nvidia-holoscan/holoscan-sensor-bridge).
+That repository also provides firmware and diagnostic tools. Follow its release compatibility
+guidance for your JetPack version. These tools are optional for the known-IP setup above.
+</Tip>
+
+## Run an application
+
+Holoscan CLI mounts the host SIPL API, installed UDDF drivers, and camera data into the application
+container when those paths exist on the host. Recreate any existing application container after
+installing the host files, then follow the application's build and run instructions:
+
+- SIPL camera preview: `applications/sipl_camera/README.md`
+- cuVSLAM on the stereo camera: `applications/cuvslam_vb1940/README.md`

@@ -1,0 +1,474 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# WBC uses the device's minimum Green Context allocation by default.
+# Set green_context.wbc_sms to 0 to disable it, or to a supported positive SM count.
+
+# GR00T preprocessing, action decoding, and scheduling.
+gr00t_n1_7:
+  sdk_joint_order: &g1_sdk_joint_order
+    - left_hip_pitch_joint
+    - left_hip_roll_joint
+    - left_hip_yaw_joint
+    - left_knee_joint
+    - left_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_hip_pitch_joint
+    - right_hip_roll_joint
+    - right_hip_yaw_joint
+    - right_knee_joint
+    - right_ankle_pitch_joint
+    - right_ankle_roll_joint
+    - waist_yaw_joint
+    - waist_roll_joint
+    - waist_pitch_joint
+    - left_shoulder_pitch_joint
+    - left_shoulder_roll_joint
+    - left_shoulder_yaw_joint
+    - left_elbow_joint
+    - left_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_shoulder_pitch_joint
+    - right_shoulder_roll_joint
+    - right_shoulder_yaw_joint
+    - right_elbow_joint
+    - right_wrist_roll_joint
+    - right_wrist_pitch_joint
+    - right_wrist_yaw_joint
+    - left_hand_thumb_0_joint
+    - left_hand_thumb_1_joint
+    - left_hand_thumb_2_joint
+    - left_hand_middle_0_joint
+    - left_hand_middle_1_joint
+    - left_hand_index_0_joint
+    - left_hand_index_1_joint
+    - right_hand_thumb_0_joint
+    - right_hand_thumb_1_joint
+    - right_hand_thumb_2_joint
+    - right_hand_middle_0_joint
+    - right_hand_middle_1_joint
+    - right_hand_index_0_joint
+    - right_hand_index_1_joint
+  # Group order follows the checkpoint inputs and may differ from sdk_joint_order.
+  state_output_spec:
+    left_leg:
+      - left_hip_pitch_joint
+      - left_hip_roll_joint
+      - left_hip_yaw_joint
+      - left_knee_joint
+      - left_ankle_pitch_joint
+      - left_ankle_roll_joint
+    right_leg:
+      - right_hip_pitch_joint
+      - right_hip_roll_joint
+      - right_hip_yaw_joint
+      - right_knee_joint
+      - right_ankle_pitch_joint
+      - right_ankle_roll_joint
+    waist: &g1_waist
+      - waist_yaw_joint
+      - waist_roll_joint
+      - waist_pitch_joint
+    left_arm: &g1_left_arm
+      - left_shoulder_pitch_joint
+      - left_shoulder_roll_joint
+      - left_shoulder_yaw_joint
+      - left_elbow_joint
+      - left_wrist_roll_joint
+      - left_wrist_pitch_joint
+      - left_wrist_yaw_joint
+    right_arm: &g1_right_arm
+      - right_shoulder_pitch_joint
+      - right_shoulder_roll_joint
+      - right_shoulder_yaw_joint
+      - right_elbow_joint
+      - right_wrist_roll_joint
+      - right_wrist_pitch_joint
+      - right_wrist_yaw_joint
+    left_hand: &g1_left_hand_state
+      - left_hand_thumb_0_joint
+      - left_hand_thumb_1_joint
+      - left_hand_thumb_2_joint
+      - left_hand_middle_0_joint
+      - left_hand_middle_1_joint
+      - left_hand_index_0_joint
+      - left_hand_index_1_joint
+    right_hand: &g1_right_hand_state
+      - right_hand_thumb_0_joint
+      - right_hand_thumb_1_joint
+      - right_hand_thumb_2_joint
+      - right_hand_index_0_joint
+      - right_hand_index_1_joint
+      - right_hand_middle_0_joint
+      - right_hand_middle_1_joint
+  view_name: ego_view
+  crop_height: 480
+  crop_width: 640
+  num_motors: 43
+  prediction_horizon: 16
+  joint_order: *g1_sdk_joint_order
+  input_spec:
+    # The checkpoint uses a different joint order for hand actions. Keep these lists explicit.
+    left_arm: *g1_left_arm
+    right_arm: *g1_right_arm
+    left_hand: &g1_left_hand_action
+      - left_hand_index_0_joint
+      - left_hand_index_1_joint
+      - left_hand_middle_0_joint
+      - left_hand_middle_1_joint
+      - left_hand_thumb_0_joint
+      - left_hand_thumb_1_joint
+      - left_hand_thumb_2_joint
+    right_hand: &g1_right_hand_action
+      - right_hand_index_0_joint
+      - right_hand_index_1_joint
+      - right_hand_middle_0_joint
+      - right_hand_middle_1_joint
+      - right_hand_thumb_0_joint
+      - right_hand_thumb_1_joint
+      - right_hand_thumb_2_joint
+    waist: *g1_waist
+  kp:
+    left_arm: [40.0]
+    right_arm: [40.0]
+    left_hand: [0.5]
+    right_hand: [0.5]
+    waist: [100.0]
+  kd:
+    left_arm: [10.0]
+    right_arm: [10.0]
+    left_hand: [0.2]
+    right_hand: [0.2]
+    waist: [10.0]
+  # Fixed capture-time interval for image selection, in seconds.
+  inference_period: 0.2
+# Agile WBC locomotion policy.
+gr00t_wbc:
+  onnx_path: data/nvidia_wbc_agile_velocity_unitree_g1/unitree_g1_velocity_e2e.onnx
+  sdk_joint_order: *g1_sdk_joint_order
+  policy_joint_order:
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - waist_yaw_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - waist_roll_joint
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - waist_pitch_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_shoulder_pitch_joint
+    - right_shoulder_pitch_joint
+    - left_ankle_pitch_joint
+    - right_ankle_pitch_joint
+    - left_shoulder_roll_joint
+    - right_shoulder_roll_joint
+    - left_ankle_roll_joint
+    - right_ankle_roll_joint
+    - left_shoulder_yaw_joint
+    - right_shoulder_yaw_joint
+    - left_elbow_joint
+    - right_elbow_joint
+    - left_wrist_roll_joint
+    - right_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - right_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_wrist_yaw_joint
+  action_joint_order:
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - waist_roll_joint
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - waist_pitch_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_ankle_pitch_joint
+    - right_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_ankle_roll_joint
+  default_joint_positions:
+    left_hip_pitch_joint: -0.1
+    right_hip_pitch_joint: -0.1
+    left_knee_joint: 0.3
+    right_knee_joint: 0.3
+    left_ankle_pitch_joint: -0.2
+    right_ankle_pitch_joint: -0.2
+    left_shoulder_roll_joint: 0.25
+    left_shoulder_yaw_joint: 0.5
+    right_shoulder_roll_joint: -0.25
+    right_shoulder_yaw_joint: -0.5
+  default_kp:
+    left_hip_pitch_joint: 40.18
+    left_hip_roll_joint: 99.1
+    left_hip_yaw_joint: 40.18
+    left_knee_joint: 99.1
+    left_ankle_pitch_joint: 28.5
+    left_ankle_roll_joint: 28.5
+    right_hip_pitch_joint: 40.18
+    right_hip_roll_joint: 99.1
+    right_hip_yaw_joint: 40.18
+    right_knee_joint: 99.1
+    right_ankle_pitch_joint: 28.5
+    right_ankle_roll_joint: 28.5
+    waist_yaw_joint: 100.0
+    waist_roll_joint: 100.0
+    waist_pitch_joint: 100.0
+    left_shoulder_pitch_joint: 100.0
+    left_shoulder_roll_joint: 100.0
+    left_shoulder_yaw_joint: 100.0
+    left_elbow_joint: 100.0
+    left_wrist_roll_joint: 100.0
+    left_wrist_pitch_joint: 100.0
+    left_wrist_yaw_joint: 100.0
+    right_shoulder_pitch_joint: 100.0
+    right_shoulder_roll_joint: 100.0
+    right_shoulder_yaw_joint: 100.0
+    right_elbow_joint: 100.0
+    right_wrist_roll_joint: 100.0
+    right_wrist_pitch_joint: 100.0
+    right_wrist_yaw_joint: 100.0
+  default_kd:
+    left_hip_pitch_joint: 2.558
+    left_hip_roll_joint: 6.309
+    left_hip_yaw_joint: 2.558
+    left_knee_joint: 6.309
+    left_ankle_pitch_joint: 1.814
+    left_ankle_roll_joint: 1.814
+    right_hip_pitch_joint: 2.558
+    right_hip_roll_joint: 6.309
+    right_hip_yaw_joint: 2.558
+    right_knee_joint: 6.309
+    right_ankle_pitch_joint: 1.814
+    right_ankle_roll_joint: 1.814
+    waist_yaw_joint: 10.0
+    waist_roll_joint: 10.0
+    waist_pitch_joint: 10.0
+    left_shoulder_pitch_joint: 10.0
+    left_shoulder_roll_joint: 10.0
+    left_shoulder_yaw_joint: 10.0
+    left_elbow_joint: 10.0
+    left_wrist_roll_joint: 10.0
+    left_wrist_pitch_joint: 10.0
+    left_wrist_yaw_joint: 10.0
+    right_shoulder_pitch_joint: 10.0
+    right_shoulder_roll_joint: 10.0
+    right_shoulder_yaw_joint: 10.0
+    right_elbow_joint: 10.0
+    right_wrist_roll_joint: 10.0
+    right_wrist_pitch_joint: 10.0
+    right_wrist_yaw_joint: 10.0
+  ang_vel_scale: 1.0
+  velocity_scale: 1.0
+  action_clamp: 10.0
+  last_actions_input_name: last_actions
+  velocity_command_lin_x: 0.0
+  velocity_command_lin_y: 0.0
+  velocity_command_ang_z: 0.0
+  history_terms:
+    - input_name: base_ang_vel_history
+      output_name: base_ang_vel_history_out
+      dim: 3
+      length: 5
+    - input_name: projected_gravity_history
+      output_name: projected_gravity_history_out
+      dim: 3
+      length: 5
+    - input_name: velocity_commands_history
+      output_name: velocity_commands_history_out
+      dim: 3
+      length: 5
+    - input_name: controlled_joint_pos_history
+      output_name: controlled_joint_pos_history_out
+      dim: 14
+      length: 5
+    - input_name: controlled_joint_vel_history
+      output_name: controlled_joint_vel_history_out
+      dim: 14
+      length: 5
+    - input_name: actions_history
+      output_name: actions_history_out
+      dim: 14
+      length: 5
+    - input_name: last_actions
+      output_name: last_actions_out
+      dim: 14
+# GR00T action selection on each WBC command.
+gr00t_action_handler:
+  action_interval_s: 0.0333333
+  handover_blend_steps: 3.0
+  feedforward_torque: true
+# Lower body from WBC; upper body and hands from GR00T.
+joint_command_combiner:
+  joint_order: *g1_sdk_joint_order
+  joint_names_from_primary: &g1_lower_body
+    - left_hip_pitch_joint
+    - left_hip_roll_joint
+    - left_hip_yaw_joint
+    - left_knee_joint
+    - left_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_hip_pitch_joint
+    - right_hip_roll_joint
+    - right_hip_yaw_joint
+    - right_knee_joint
+    - right_ankle_pitch_joint
+    - right_ankle_roll_joint
+    - waist_yaw_joint
+    - waist_roll_joint
+    - waist_pitch_joint
+  joint_names_from_overlay: &g1_upper_body
+    - left_shoulder_pitch_joint
+    - left_shoulder_roll_joint
+    - left_shoulder_yaw_joint
+    - left_elbow_joint
+    - left_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_shoulder_pitch_joint
+    - right_shoulder_roll_joint
+    - right_shoulder_yaw_joint
+    - right_elbow_joint
+    - right_wrist_roll_joint
+    - right_wrist_pitch_joint
+    - right_wrist_yaw_joint
+    - left_hand_thumb_0_joint
+    - left_hand_thumb_1_joint
+    - left_hand_thumb_2_joint
+    - left_hand_middle_0_joint
+    - left_hand_middle_1_joint
+    - left_hand_index_0_joint
+    - left_hand_index_1_joint
+    - right_hand_thumb_0_joint
+    - right_hand_thumb_1_joint
+    - right_hand_thumb_2_joint
+    - right_hand_middle_0_joint
+    - right_hand_middle_1_joint
+    - right_hand_index_0_joint
+    - right_hand_index_1_joint
+  overlay_startup_delay_s: 1.0
+mock_image_source:
+  frame_rate: 30
+
+# Simulator control profile. These sections match their operator schemas so the application can
+# bind them directly.
+sim:
+  gr00t_n1_7:
+    sdk_joint_order: *g1_sdk_joint_order
+    state_output_spec:
+      waist: *g1_waist
+      left_arm: *g1_left_arm
+      right_arm: *g1_right_arm
+      left_hand: *g1_left_hand_state
+      right_hand: *g1_right_hand_state
+    view_name: ego_view
+    crop_height: 480
+    crop_width: 640
+    num_motors: 43
+    prediction_horizon: 40
+    joint_order: *g1_sdk_joint_order
+    input_spec:
+      left_arm: *g1_left_arm
+      right_arm: *g1_right_arm
+      left_hand: *g1_left_hand_action
+      right_hand: *g1_right_hand_action
+      waist: *g1_waist
+    kp:
+      left_arm: [40.0]
+      right_arm: [40.0]
+      left_hand: [0.5]
+      right_hand: [0.5]
+      waist: [100.0]
+    kd:
+      left_arm: [10.0]
+      right_arm: [10.0]
+      left_hand: [0.2]
+      right_hand: [0.2]
+      waist: [10.0]
+    inference_period: 0.7
+    # Simulator camera and joint state share capture timestamps.
+    align_observations: true
+  gr00t_action_handler:
+    action_interval_s: 0.02
+    handover_blend_steps: 3.0
+    feedforward_torque: true
+  joint_command_combiner:
+    joint_order: *g1_sdk_joint_order
+    joint_names_from_primary: *g1_lower_body
+    joint_names_from_overlay: *g1_upper_body
+    overlay_startup_delay_s: 0.0
+  start_up:
+    handover_only: true
+    sdk_joint_order: *g1_sdk_joint_order
+    upper_body_joints: *g1_upper_body
+    handover_duration: 2.0
+  holoviz:
+    width: 640
+    height: 480
+    window_title: "G1 Simulator Camera"
+
+# Real robot I/O, startup, and deployment.
+operator_pinning:
+  enable: false
+  wbc_core: 13
+  wbc_priority: 10
+  gr00t_core: 12
+  gr00t_priority: 5
+unitree_g1_robot:
+  network_interface: enP2p1s0
+  g1_num_motors: 43
+  dds_domain_id: 0
+  mode_machine: 6
+camera:
+  device: /dev/video4
+  width: 640
+  height: 480
+  frame_rate: 30
+gamepad:
+  lin_speed: 0.5
+  ang_speed: 0.5
+  emit_period: 0.004 # s between device polls; well above the wbc 50 Hz control rate
+  gamepad_device: ''
+  gamepad_deadzone: 0.1
+  keyboard_device: ''
+start_up:
+  sdk_joint_order: *g1_sdk_joint_order
+  config_file: operators/start_up/config/g1_start_up.yaml
+  auto_enable_delay: 60.0
+  upper_body_joints:
+    - left_shoulder_pitch_joint
+    - left_shoulder_roll_joint
+    - left_shoulder_yaw_joint
+    - left_elbow_joint
+    - left_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_shoulder_pitch_joint
+    - right_shoulder_roll_joint
+    - right_shoulder_yaw_joint
+    - right_elbow_joint
+    - right_wrist_roll_joint
+    - right_wrist_pitch_joint
+    - right_wrist_yaw_joint
+    - left_hand_thumb_0_joint
+    - left_hand_thumb_1_joint
+    - left_hand_thumb_2_joint
+    - left_hand_middle_0_joint
+    - left_hand_middle_1_joint
+    - left_hand_index_0_joint
+    - left_hand_index_1_joint
+    - right_hand_thumb_0_joint
+    - right_hand_thumb_1_joint
+    - right_hand_thumb_2_joint
+    - right_hand_middle_0_joint
+    - right_hand_middle_1_joint
+    - right_hand_index_0_joint
+    - right_hand_index_1_joint
+    - waist_yaw_joint
+    - waist_roll_joint
+    - waist_pitch_joint

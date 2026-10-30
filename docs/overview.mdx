@@ -1,0 +1,170 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Isaac OS
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Start with Isaac OS" hidePrompt actions={["cursor"]}>
+Read [For agents](/isaac-os/for-agents). If there are no clear Isaac OS tasks
+in our conversation or project, ask me for missing details.
+</Prompt>
+</llms-ignore>
+
+**Enable robotics developers to build and deploy enterprise-grade physical AI robot
+applications with speed-of-light performance on NVIDIA Edge hardware.**
+
+<CardGroup cols={3}>
+<Card title="Speed of light" icon="bolt" color="#76B900">
+
+Optimized end to end for NVIDIA hardware, for deterministic real-time control next
+to AI inference. [See the numbers](#performance).
+
+</Card>
+<Card title="Enterprise readiness" icon="shield-halved" color="#76B900">
+
+Built for production robots on the enterprise-supported
+[Holoscan platform](https://holoscan.org).
+[Ask about NVIDIA AI Enterprise](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/contact-sales/).
+
+</Card>
+<Card title="ROS 2 interop" icon="arrows-left-right" color="#76B900">
+
+Connect your ROS 2 node with the [ROS 2 Bridge](/isaac-os/how-to/connect-a-ros-2-graph).
+See how ROS 2 can map to Isaac OS [here](/isaac-os/explanation/isaac-os-and-ros-2).
+
+</Card>
+</CardGroup>
+
+## Full robotics stack
+
+Isaac OS is the NVIDIA-native robotics stack for deploying humanoids, mobile robots
+and manipulators. It brings together:
+
+- **NVIDIA Edge hardware:** AGX and IGX [platforms](/isaac-os/reference/platforms).
+- **NVIDIA system software:** JetPack, IGX OS, CUDA and TensorRT.
+- **Holoscan-based middleware and reusable components:** compute graphs, message
+  passing and GPU resource management for low-latency control alongside AI inference.
+- **Developer resources:** reference applications, performance benchmarks, tutorials
+  and agent skills.
+
+[This repository](..) provides the reference applications and developer resources.
+
+<Anchor id="performance" />
+
+## Performance
+
+**Real-time control and AI inference on the same chip.** Isaac OS partitions
+CPU and GPU resources so control loops keep their deadlines and determinism while AI
+policies and other heavy workloads share the hardware. Measured on Jetson AGX Thor with about
+one hour of samples per condition:
+
+<CardGroup cols={3}>
+<Card title="7× lower WBC tail latency, 13× less jitter" icon="person-walking">
+
+GR00T N1.7 runs at 5 Hz on the same GPU. With Green Context, WBC p99.9 latency:
+**2.57 → 0.37 ms**, jitter **3.00 → 0.23 ms**.
+[Full benchmark](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1/benchmark)
+
+</Card>
+<Card title="25× lower GPU control latency" icon="microchip">
+
+1 kHz GPU IK, 1,024 candidates in parallel, under heavy GPU load. With Green Context
+isolation: p99.99
+**6.60 → 0.27 ms**, late commands **3.1 million → 0**.
+[Full benchmark](/isaac-os/reference/applications/robot-control-benchmark)
+
+</Card>
+<Card title="Under 19 µs on the CPU" icon="stopwatch">
+
+1 kHz CPU IK, one solve per cycle, on isolated PREEMPT_RT cores: p99.99
+**under 19 µs** with or without stress-ng, **0** late commands.
+[Full benchmark](/isaac-os/reference/applications/robot-control-benchmark)
+
+</Card>
+</CardGroup>
+
+<Anchor id="try-it-now" />
+
+## Try it now
+
+**Run GR00T N1.7 and whole-body control on a simulated G1 in two commands.**
+Start with [Getting started](/isaac-os/tutorials/getting-started) for host setup and
+checkout. Run commands from the repository root; the simulation examples also use
+[Isaac Sim setup](/isaac-os/how-to/set-up-isaac-sim). Start the two terminals in either order.
+
+<Tabs>
+<Tab title="G1 + GR00T in Isaac Sim">
+
+_x86_64 only_
+
+Run GR00T N1.7 with whole-body control to balance a G1 and move an apple onto a plate.
+The first run builds five TensorRT engines and takes several minutes; later runs
+reuse them. Set the same `DISPLAY` in both terminals to see the robot, or leave it
+unset for a headless run.
+
+**Terminal 1: simulator**
+
+```bash
+./isaac_sim run --scene operators/unitree_g1/assets/g1_static_apple_ucx.usda \
+  -- --substeps 4
+```
+
+**Terminal 2: controller**
+
+```bash
+./isaac_os run gr00t_n1_7_wbc_g1 sim
+```
+
+[See details](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#isaac-sim).
+
+</Tab>
+<Tab title="SO-101 in Isaac Sim">
+
+_x86_64 only_
+
+Move a simulated SO-101 arm with sinusoidal joint commands.
+
+**Terminal 1: simulator**
+
+```bash
+./isaac_sim run --scene operators/so101/assets/so101_ucx_with_env.usda
+```
+
+**Terminal 2: controller**
+
+```bash
+./isaac_os run so101_sinus_motion sim
+```
+
+[See details](/isaac-os/reference/applications/so101-sinus-motion#isaac-sim).
+
+</Tab>
+<Tab title="SO-101 mock">
+
+Run the SO-101 control graph with synthetic inputs and inspect joint commands in
+your terminal. No simulator or robot is needed; the run stops after 100 commands.
+
+```bash
+./isaac_os run so101_sinus_motion mock -- --message-count=100
+```
+
+[See details](/isaac-os/tutorials/getting-started).
+
+</Tab>
+</Tabs>
+
+---
+
+<Anchor id="go-further" />
+
+## Go further
+
+- **Evaluate:** explore [application results](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1/benchmark#results)
+  and [platform support](/isaac-os/reference/platforms).
+- **Try:** follow [SO-101 reach deployment](/isaac-os/tutorials/so101-reach/deployment)
+  or the [GR00T and whole-body control tutorial](/isaac-os/tutorials/gr00t-wbc).
+- **Adapt:** [integrate components](/isaac-os/how-to/integrate-in-your-project),
+  [add a robot embodiment](/isaac-os/how-to/add-a-robot-embodiment), or
+  [exchange messages with ROS 2](/isaac-os/how-to/connect-a-ros-2-graph).

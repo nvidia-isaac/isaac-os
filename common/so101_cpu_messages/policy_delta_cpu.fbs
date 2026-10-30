@@ -1,0 +1,15 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+
+namespace isaac;
+
+/// Four-axis clipped reach-policy action tied to its source state.
+table PolicyDeltaCpu {
+  action: [float] (id: 0, required);
+  source_sequence: ulong (id: 1);
+  fault_epoch: ulong (id: 2);
+}
+
+root_type PolicyDeltaCpu;
+file_identifier "ISPD";

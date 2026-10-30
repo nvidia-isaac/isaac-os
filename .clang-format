@@ -1,0 +1,41 @@
+Language: Cpp
+BasedOnStyle: Google
+ColumnLimit: 100
+CommentPragmas: '(^ IWYU pragma:|SPDX-FileCopyrightText:)'
+IncludeCategories:
+  # These are third party headers without a leading folder.
+  - Regex: '^(<|")(cuda|cuvid|Nv|magic_enum|Python).*\.(h|hpp)(>|")$'
+    Priority: 3
+  # These are third party headers with a leading folder.
+  # This includes NVIDIA headers from outside of this project.
+  - Regex: '^(<|")(3rdparty|ATen|benchmark|booster|c10|cvcuda|Eigen|gxf|fmt|foxglove|flatbuffers|ftservo|gtest|holoscan|librealsense2|matx|mujoco|nanoflann|nlohmann|nvcv|opencv2|openssl|pybind11|rclcpp|third_party|torch|ucp|ucxx|unitree|yaml-cpp)/.*(>|")$'
+    Priority: 3
+  # The default regexes. For some reason, if we don't specify them here, then
+  # clang-format will overwrite them with the custom ones we specify above.
+  - Regex: '^<ext/.*\.h>'
+    Priority: 2
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: '^<.*\.h>'
+    Priority: 1
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: '^<.*'
+    Priority: 2
+    SortPriority: 0
+    CaseSensitive: false
+  - Regex: '.*'
+    Priority: 4
+    SortPriority: 0
+    CaseSensitive: false
+---
+Language: Proto
+BasedOnStyle: Google
+CommentPragmas: '(^ IWYU pragma:|SPDX-FileCopyrightText:)'
+---
+Language: Json
+BasedOnStyle: Google
+---
+Language: JavaScript
+BasedOnStyle: Google
+CommentPragmas: '(^ IWYU pragma:|SPDX-FileCopyrightText:)'

@@ -1,0 +1,20 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+namespace isaac;
+
+// A CPU joint command chunk. Time-varying values use joint-major order:
+// values[joint * action_count + action].
+table JointCommandChunkCpu {
+  position: [float] (id: 0, required);
+  effort: [float] (id: 1, required);
+  joint_count: uint (id: 2);
+  action_count: uint (id: 3);
+  kp: [float] (id: 4, required);
+  kd: [float] (id: 5, required);
+  // Capture time of the image used for this prediction. Zero means unavailable.
+  image_capture_time_ns: long (id: 6);
+}
+
+root_type JointCommandChunkCpu;
+file_identifier "ISJK";

@@ -1,0 +1,666 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# GPU green-context SM partition: split Thor's 20 SMs between the WBC fast loop and the GR00T slow
+# loop. The two partitions must sum to <= 20.
+green_context:
+  wbc_sms: 2
+  gr00t_sms: 18
+
+# Real-time CPU-thread pinning. Opt-in (enable: false by default). The WBC 50 Hz control chain and
+# the GR00T heavy op are pinned to dedicated SCHED_FIFO cores so the fast loop's host-side launches
+# never wait behind a general-purpose worker. Cores 12 & 13 are the boot-isolated RT cores on this
+# host. Priorities are SCHED_FIFO and must be <= the run container's rtprio ceiling (10); honored
+# only under the EventBasedScheduler.
+operator_pinning:
+  enable: false
+  wbc_core: 13
+  wbc_priority: 10
+  gr00t_core: 12
+  gr00t_priority: 5
+
+unitree_g1_robot:
+  network_interface: "enP2p1s0"
+  # 43 = G1 body (29 DOFs) + Dex 3-1 hands (14 DOFs).  The DDS publisher checks
+  # this against the postprocessor's output size, so it must match
+  # sdk_joint_order below.
+  g1_num_motors: 43
+
+# --- Device teleop (gamepad + keyboard, one operator) ---
+# TeleopTwistCommandOp reads a gamepad (primary) and a keyboard (fallback).
+# Composed only when the app is launched with --gamepad. Look at README for more detail
+gamepad:
+  lin_speed: 0.5 # m/s at full stick deflection / while a key is held
+  ang_speed: 0.5 # rad/s at full stick deflection / while a key is held
+  emit_period: 0.004 # s between device polls; well above the 50 Hz control rate so a
+  # command is at most one poll old when the policy reads it
+  gamepad_device: '' # evdev node or name substring, e.g. /dev/input/event12 or "Xbox" ('' = auto-detect)
+  gamepad_deadzone: 0.1 # fraction of full stick deflection ignored around centre
+  keyboard_device: '' # evdev node or name substring ('' = auto-detect)
+
+camera:
+  device: "/dev/video4"
+  frame_rate: 30
+  height: 480
+  width: 640
+  pixel_format: "YUYV"
+  pass_through: true
+  # Do NOT set `gain`/`exposure_time` here: V4L2VideoCaptureOp issues VIDIOC_S_CTRL for these at
+  # startup, and this device's "Camera Controls" class (gain, exposure) rejects writes with
+  # EACCES for our (non-root, container) user — crashes the app on start. The "User Controls"
+  # class (brightness, gamma, contrast) is writable and does affect the actual pixel data, so
+  # under-exposure is compensated externally via `v4l2-ctl -d /dev/video4 -c brightness=... -c
+  # gamma=...` before launching the app, not through this config.
+
+format_converter:
+  in_dtype: "yuyv"
+  out_dtype: "rgb888" # 3 bytes/px - 3*w*h pool block size
+  out_tensor_name: ""
+
+# --- Holoviz display ---
+holoviz:
+  width: 640
+  height: 480
+  window_title: "V4L2 Camera Viewer"
+  tensors:
+    - name: ""
+      type: color
+      opacity: 1.0
+      priority: 0
+
+joint_orders:
+  # Unitree SDK order for all 43 motors (index 0-42).
+  g1_sdk_43: &g1_sdk_43
+    - left_hip_pitch_joint
+    - left_hip_roll_joint
+    - left_hip_yaw_joint
+    - left_knee_joint
+    - left_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_hip_pitch_joint
+    - right_hip_roll_joint
+    - right_hip_yaw_joint
+    - right_knee_joint
+    - right_ankle_pitch_joint
+    - right_ankle_roll_joint
+    - waist_yaw_joint
+    - waist_roll_joint
+    - waist_pitch_joint
+    - left_shoulder_pitch_joint
+    - left_shoulder_roll_joint
+    - left_shoulder_yaw_joint
+    - left_elbow_joint
+    - left_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_shoulder_pitch_joint
+    - right_shoulder_roll_joint
+    - right_shoulder_yaw_joint
+    - right_elbow_joint
+    - right_wrist_roll_joint
+    - right_wrist_pitch_joint
+    - right_wrist_yaw_joint
+    - left_hand_thumb_0_joint
+    - left_hand_thumb_1_joint
+    - left_hand_thumb_2_joint
+    - left_hand_middle_0_joint
+    - left_hand_middle_1_joint
+    - left_hand_index_0_joint
+    - left_hand_index_1_joint
+    - right_hand_thumb_0_joint
+    - right_hand_thumb_1_joint
+    - right_hand_thumb_2_joint
+    - right_hand_middle_0_joint
+    - right_hand_middle_1_joint
+    - right_hand_index_0_joint
+    - right_hand_index_1_joint
+
+  # Observation layout for policy / state.body (29 joints, interleaved L/R + waist).
+  g1_policy_body_29: &g1_policy_body_29
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - waist_yaw_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - waist_roll_joint
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - waist_pitch_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_shoulder_pitch_joint
+    - right_shoulder_pitch_joint
+    - left_ankle_pitch_joint
+    - right_ankle_pitch_joint
+    - left_shoulder_roll_joint
+    - right_shoulder_roll_joint
+    - left_ankle_roll_joint
+    - right_ankle_roll_joint
+    - left_shoulder_yaw_joint
+    - right_shoulder_yaw_joint
+    - left_elbow_joint
+    - right_elbow_joint
+    - left_wrist_roll_joint
+    - right_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - right_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_wrist_yaw_joint
+
+  # GR00T postprocess action.upper_body slice (14).
+  g1_gr00t_arm_14: &g1_gr00t_arm_14
+    - left_shoulder_pitch_joint
+    - right_shoulder_pitch_joint
+    - left_shoulder_roll_joint
+    - right_shoulder_roll_joint
+    - left_shoulder_yaw_joint
+    - right_shoulder_yaw_joint
+    - left_elbow_joint
+    - right_elbow_joint
+    - left_wrist_roll_joint
+    - right_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - right_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_wrist_yaw_joint
+
+  # WBC MLP policy action slice: legs + waist (14).
+  g1_wbc_action_joints_14: &g1_wbc_action_joints_14
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - waist_roll_joint
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - waist_pitch_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_ankle_pitch_joint
+    - right_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_ankle_roll_joint
+
+  # Hybrid combiner: lower body from WBC (15).
+  hybrid_lower_body_15: &hybrid_lower_body_15
+    - left_hip_pitch_joint
+    - left_hip_roll_joint
+    - left_hip_yaw_joint
+    - left_knee_joint
+    - left_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_hip_pitch_joint
+    - right_hip_roll_joint
+    - right_hip_yaw_joint
+    - right_knee_joint
+    - right_ankle_pitch_joint
+    - right_ankle_roll_joint
+    - waist_yaw_joint
+    - waist_roll_joint
+    - waist_pitch_joint
+
+  # Hybrid combiner: upper body + hands from GR00T (28 = arm 14 + hand 14).
+  hybrid_gr00t_upper_28: &hybrid_gr00t_upper_28
+    - left_shoulder_pitch_joint
+    - left_shoulder_roll_joint
+    - left_shoulder_yaw_joint
+    - left_elbow_joint
+    - left_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_shoulder_pitch_joint
+    - right_shoulder_roll_joint
+    - right_shoulder_yaw_joint
+    - right_elbow_joint
+    - right_wrist_roll_joint
+    - right_wrist_pitch_joint
+    - right_wrist_yaw_joint
+    - left_hand_thumb_0_joint
+    - left_hand_thumb_1_joint
+    - left_hand_thumb_2_joint
+    - left_hand_middle_0_joint
+    - left_hand_middle_1_joint
+    - left_hand_index_0_joint
+    - left_hand_index_1_joint
+    - right_hand_thumb_0_joint
+    - right_hand_thumb_1_joint
+    - right_hand_thumb_2_joint
+    - right_hand_middle_0_joint
+    - right_hand_middle_1_joint
+    - right_hand_index_0_joint
+    - right_hand_index_1_joint
+
+# Mock joint-state source (used by the control-subgraph test; harmless for the app).
+mock_joint_source:
+  joint_names: *g1_sdk_43
+
+mock_image_input:
+  n_dim: 3
+  dims:
+    - 480
+    - 640
+    - 3
+sequential_inference_gating: true
+
+# ── N1.7 joint groups ─────────────────────────────────────────────────────────
+# Intra-group order is assumed to equal SDK order (g1_sdk_43); must match the checkpoint's
+# training order — CONFIRM with Billy Okal before trusting motion.
+#
+# Hand groups are split into separate state-input and action-output orders because the
+# checkpoint uses DIFFERENT intra-group orders for each (confirmed against
+# data/n17/g1-apple-to-plate/exported_leapp.yaml `element_names`, the ground truth for each
+# ONNX model's column order):
+#   preprocess_state input  left_hand:  thumb0,1,2, middle0,1, index0,1
+#   preprocess_state input  right_hand: thumb0,1,2, index0, middle0, index1, middle1
+#   decode_action output    {left,right}_hand: index0,1, middle0,1, thumb0,1,2
+joint_groups_n17:
+  left_leg: &g1_left_leg_6
+    - left_hip_pitch_joint
+    - left_hip_roll_joint
+    - left_hip_yaw_joint
+    - left_knee_joint
+    - left_ankle_pitch_joint
+    - left_ankle_roll_joint
+  right_leg: &g1_right_leg_6
+    - right_hip_pitch_joint
+    - right_hip_roll_joint
+    - right_hip_yaw_joint
+    - right_knee_joint
+    - right_ankle_pitch_joint
+    - right_ankle_roll_joint
+  waist: &g1_waist_3
+    - waist_yaw_joint
+    - waist_roll_joint
+    - waist_pitch_joint
+  left_arm: &g1_left_arm_7
+    - left_shoulder_pitch_joint
+    - left_shoulder_roll_joint
+    - left_shoulder_yaw_joint
+    - left_elbow_joint
+    - left_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - left_wrist_yaw_joint
+  right_arm: &g1_right_arm_7
+    - right_shoulder_pitch_joint
+    - right_shoulder_roll_joint
+    - right_shoulder_yaw_joint
+    - right_elbow_joint
+    - right_wrist_roll_joint
+    - right_wrist_pitch_joint
+    - right_wrist_yaw_joint
+  # State-input order (preprocess_state.onnx), from exported_leapp.yaml element_names.
+  left_hand_state: &g1_left_hand_state_7
+    - left_hand_thumb_0_joint
+    - left_hand_thumb_1_joint
+    - left_hand_thumb_2_joint
+    - left_hand_middle_0_joint
+    - left_hand_middle_1_joint
+    - left_hand_index_0_joint
+    - left_hand_index_1_joint
+  right_hand_state: &g1_right_hand_state_7
+    - right_hand_thumb_0_joint
+    - right_hand_thumb_1_joint
+    - right_hand_thumb_2_joint
+    - right_hand_index_0_joint
+    - right_hand_index_1_joint
+    - right_hand_middle_0_joint
+    - right_hand_middle_1_joint
+  # Action-output order (decode_action.onnx), from exported_leapp.yaml element_names. Differs
+  # from the state-input order above — do not reuse one list for both.
+  left_hand_action: &g1_left_hand_action_7
+    - left_hand_index_0_joint
+    - left_hand_index_1_joint
+    - left_hand_middle_0_joint
+    - left_hand_middle_1_joint
+    - left_hand_thumb_0_joint
+    - left_hand_thumb_1_joint
+    - left_hand_thumb_2_joint
+  right_hand_action: &g1_right_hand_action_7
+    - right_hand_index_0_joint
+    - right_hand_index_1_joint
+    - right_hand_middle_0_joint
+    - right_hand_middle_1_joint
+    - right_hand_thumb_0_joint
+    - right_hand_thumb_1_joint
+    - right_hand_thumb_2_joint
+  # Combiner split: legs (12) from WBC; arms+hands+waist (31) from GR00T N1.7.
+  legs_12: &g1_legs_12
+    - left_hip_pitch_joint
+    - left_hip_roll_joint
+    - left_hip_yaw_joint
+    - left_knee_joint
+    - left_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_hip_pitch_joint
+    - right_hip_roll_joint
+    - right_hip_yaw_joint
+    - right_knee_joint
+    - right_ankle_pitch_joint
+    - right_ankle_roll_joint
+  gr00t_upper_31: &g1_gr00t_upper_31
+    - left_shoulder_pitch_joint
+    - left_shoulder_roll_joint
+    - left_shoulder_yaw_joint
+    - left_elbow_joint
+    - left_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_shoulder_pitch_joint
+    - right_shoulder_roll_joint
+    - right_shoulder_yaw_joint
+    - right_elbow_joint
+    - right_wrist_roll_joint
+    - right_wrist_pitch_joint
+    - right_wrist_yaw_joint
+    - left_hand_thumb_0_joint
+    - left_hand_thumb_1_joint
+    - left_hand_thumb_2_joint
+    - left_hand_middle_0_joint
+    - left_hand_middle_1_joint
+    - left_hand_index_0_joint
+    - left_hand_index_1_joint
+    - right_hand_thumb_0_joint
+    - right_hand_thumb_1_joint
+    - right_hand_thumb_2_joint
+    - right_hand_middle_0_joint
+    - right_hand_middle_1_joint
+    - right_hand_index_0_joint
+    - right_hand_index_1_joint
+    - waist_yaw_joint
+    - waist_roll_joint
+    - waist_pitch_joint
+
+# GR00T configuration profiles. Shared application configuration remains at the root; each GR00T
+# control subgraph reads the profile matching its execution environment.
+profiles:
+  real:
+    periodic_conditions:
+      inference: 0.2 # 5 Hz
+    gr00t_n1_7_inference:
+      config_path: operators/gr00t_n1_7/config/n1_7_g1.yaml
+    # Seven state groups (positions) + ego_view video (float32 [1,480,640,3]).
+    gr00t_n1_7_preprocessor:
+      sdk_joint_order: *g1_sdk_43
+      state_output_spec:
+        left_leg: *g1_left_leg_6
+        right_leg: *g1_right_leg_6
+        waist: *g1_waist_3
+        left_arm: *g1_left_arm_7
+        right_arm: *g1_right_arm_7
+        left_hand: *g1_left_hand_state_7
+        right_hand: *g1_right_hand_state_7
+      view_name: ego_view
+      crop_height: 480
+      crop_width: 640
+    gr00t_n1_7_postprocessor:
+      num_motors: 43
+      prediction_horizon: 16
+      joint_order: *g1_sdk_43
+      input_spec:
+        left_arm: *g1_left_arm_7
+        right_arm: *g1_right_arm_7
+        left_hand: *g1_left_hand_action_7
+        right_hand: *g1_right_hand_action_7
+        waist: *g1_waist_3
+      kp:
+        left_arm: [40.0]
+        right_arm: [40.0]
+        left_hand: [0.5]
+        right_hand: [0.5]
+        waist: [100.0]
+      kd:
+        left_arm: [10.0]
+        right_arm: [10.0]
+        left_hand: [0.2]
+        right_hand: [0.2]
+        waist: [10.0]
+    action_handler:
+      # Seconds per chunk step, at the 30 Hz the checkpoint was trained at. Maps the camera frame's
+      # measured age onto a position in the chunk, so it sets playback speed.
+      dt: 0.0333333
+      # Chunk steps over which the position discontinuity at chunk handover decays to zero;
+      # 0 disables. Keep well under the ~6 steps between replans so each handover finishes before
+      # the next chunk arrives.
+      handover_blend_steps: 3.0
+      feedforward_torque: true # set false to output zero effort (e.g. for gravity-comp experiments)
+      gpu_output: false # emit CPU tensors for the CPU-side combiner
+
+  sim:
+    periodic_conditions:
+      # Replan before the last valid action at step 39 (0.78 s) to leave cadence-jitter headroom.
+      inference: 0.7
+    gr00t_n1_7_inference:
+      config_path: operators/gr00t_n1_7/config/n1_7_g1_apple_sim_trt.yaml
+    # The simulator policy observes only the five upper-body state groups.
+    gr00t_n1_7_preprocessor:
+      sdk_joint_order: *g1_sdk_43
+      state_output_spec:
+        waist: *g1_waist_3
+        left_arm: *g1_left_arm_7
+        right_arm: *g1_right_arm_7
+        left_hand: *g1_left_hand_state_7
+        right_hand: *g1_right_hand_state_7
+      view_name: ego_view
+      crop_height: 480
+      crop_width: 640
+    gr00t_n1_7_postprocessor:
+      num_motors: 43
+      prediction_horizon: 40
+      joint_order: *g1_sdk_43
+      input_spec:
+        left_arm: *g1_left_arm_7
+        right_arm: *g1_right_arm_7
+        left_hand: *g1_left_hand_action_7
+        right_hand: *g1_right_hand_action_7
+        waist: *g1_waist_3
+      kp:
+        left_arm: [40.0]
+        right_arm: [40.0]
+        left_hand: [0.5]
+        right_hand: [0.5]
+        waist: [100.0]
+      kd:
+        left_arm: [10.0]
+        right_arm: [10.0]
+        left_hand: [0.2]
+        right_hand: [0.2]
+        waist: [10.0]
+    action_handler:
+      # Replay all 40 steps at the simulator's 50 Hz control rate.
+      dt: 0.02
+      gpu_output: false
+    g1_sim_ucx:
+      hostname: "127.0.0.1"
+      port: 50008
+      defer_connection_until_graph_start: true
+      enable_camera: true
+      camera_tensor_buffer_size: 1228800
+
+# Agile WBC locomotion policy (legs+waist), run as a single Gr00tWbcOp with direct TRT
+# inference. Replaces the former G1WbcMlpInferenceSubgraph + its history_buffer/preprocessor/
+# policy_inference/postprocessor config family.
+gr00t_wbc:
+  onnx_path: data/nvidia_wbc_agile_velocity_unitree_g1/unitree_g1_velocity_e2e.onnx
+  sdk_joint_order: *g1_sdk_43
+  policy_joint_order:
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - waist_yaw_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - waist_roll_joint
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - waist_pitch_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_shoulder_pitch_joint
+    - right_shoulder_pitch_joint
+    - left_ankle_pitch_joint
+    - right_ankle_pitch_joint
+    - left_shoulder_roll_joint
+    - right_shoulder_roll_joint
+    - left_ankle_roll_joint
+    - right_ankle_roll_joint
+    - left_shoulder_yaw_joint
+    - right_shoulder_yaw_joint
+    - left_elbow_joint
+    - right_elbow_joint
+    - left_wrist_roll_joint
+    - right_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - right_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_wrist_yaw_joint
+  action_joint_order:
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - waist_roll_joint
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - waist_pitch_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_ankle_pitch_joint
+    - right_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_ankle_roll_joint
+  default_joint_positions:
+    left_hip_pitch_joint: -0.1
+    right_hip_pitch_joint: -0.1
+    left_knee_joint: 0.3
+    right_knee_joint: 0.3
+    left_ankle_pitch_joint: -0.2
+    right_ankle_pitch_joint: -0.2
+  default_kp:
+    left_hip_pitch_joint: 40.18
+    left_hip_roll_joint: 99.10
+    left_hip_yaw_joint: 40.18
+    left_knee_joint: 99.10
+    left_ankle_pitch_joint: 28.50
+    left_ankle_roll_joint: 28.50
+    right_hip_pitch_joint: 40.18
+    right_hip_roll_joint: 99.10
+    right_hip_yaw_joint: 40.18
+    right_knee_joint: 99.10
+    right_ankle_pitch_joint: 28.50
+    right_ankle_roll_joint: 28.50
+    waist_yaw_joint: 100.0
+    waist_roll_joint: 100.0
+    waist_pitch_joint: 100.0
+    left_shoulder_pitch_joint: 100.0
+    left_shoulder_roll_joint: 100.0
+    left_shoulder_yaw_joint: 100.0
+    left_elbow_joint: 100.0
+    left_wrist_roll_joint: 100.0
+    left_wrist_pitch_joint: 100.0
+    left_wrist_yaw_joint: 100.0
+    right_shoulder_pitch_joint: 100.0
+    right_shoulder_roll_joint: 100.0
+    right_shoulder_yaw_joint: 100.0
+    right_elbow_joint: 100.0
+    right_wrist_roll_joint: 100.0
+    right_wrist_pitch_joint: 100.0
+    right_wrist_yaw_joint: 100.0
+  default_kd:
+    left_hip_pitch_joint: 2.558
+    left_hip_roll_joint: 6.309
+    left_hip_yaw_joint: 2.558
+    left_knee_joint: 6.309
+    left_ankle_pitch_joint: 1.814
+    left_ankle_roll_joint: 1.814
+    right_hip_pitch_joint: 2.558
+    right_hip_roll_joint: 6.309
+    right_hip_yaw_joint: 2.558
+    right_knee_joint: 6.309
+    right_ankle_pitch_joint: 1.814
+    right_ankle_roll_joint: 1.814
+    waist_yaw_joint: 10.0
+    waist_roll_joint: 10.0
+    waist_pitch_joint: 10.0
+    left_shoulder_pitch_joint: 10.0
+    left_shoulder_roll_joint: 10.0
+    left_shoulder_yaw_joint: 10.0
+    left_elbow_joint: 10.0
+    left_wrist_roll_joint: 10.0
+    left_wrist_pitch_joint: 10.0
+    left_wrist_yaw_joint: 10.0
+    right_shoulder_pitch_joint: 10.0
+    right_shoulder_roll_joint: 10.0
+    right_shoulder_yaw_joint: 10.0
+    right_elbow_joint: 10.0
+    right_wrist_roll_joint: 10.0
+    right_wrist_pitch_joint: 10.0
+    right_wrist_yaw_joint: 10.0
+  ang_vel_scale: 1.0
+  velocity_scale: 1.0
+  action_clamp: 10.0
+  last_actions_input_name: "last_actions"
+  velocity_command_lin_x: 0.0
+  velocity_command_lin_y: 0.0
+  velocity_command_ang_z: 0.0
+  history_terms:
+    - input_name: base_ang_vel_history
+      output_name: base_ang_vel_history_out
+      dim: 3
+      length: 5
+    - input_name: projected_gravity_history
+      output_name: projected_gravity_history_out
+      dim: 3
+      length: 5
+    - input_name: velocity_commands_history
+      output_name: velocity_commands_history_out
+      dim: 3
+      length: 5
+    - input_name: controlled_joint_pos_history
+      output_name: controlled_joint_pos_history_out
+      dim: 14
+      length: 5
+    - input_name: controlled_joint_vel_history
+      output_name: controlled_joint_vel_history_out
+      dim: 14
+      length: 5
+    - input_name: actions_history
+      output_name: actions_history_out
+      dim: 14
+      length: 5
+    - input_name: last_actions
+      output_name: last_actions_out
+      dim: 14
+
+# WBC controls the legs and waist; N1.7 controls the arms and hands.
+wbc_gr00t_joint_command_combiner:
+  sdk_joint_order: *g1_sdk_43
+  joint_names_from_wbc: *hybrid_lower_body_15
+  joint_names_from_gr00t: *hybrid_gr00t_upper_28
+  gpu_output: false
+  # Real-app handoff delay.
+  gr00t_startup_delay_s: 1.0
+
+# Simulator hybrid command partition.
+sim_wbc_gr00t_joint_command_combiner:
+  sdk_joint_order: *g1_sdk_43
+  joint_names_from_wbc: *hybrid_lower_body_15
+  joint_names_from_gr00t: *hybrid_gr00t_upper_28
+  gpu_output: false
+  gr00t_startup_delay_s: 0.0
+
+# --- Stable start-up controller ---
+# Moves the G1 into a kinematically stable standing pose on startup, through a series of waypoints
+# then releases control to the WBC/GR00T controller. The setup routine lives in the linked config_file.
+start_up:
+  sdk_joint_order: *g1_sdk_43 # 43-joint publisher command order
+  config_file: operators/start_up/config/g1_start_up.yaml
+  auto_enable_delay: 60.0 # s holding the final pose before automatic enable (0 = immediate)
+  upper_body_joints: *g1_gr00t_upper_31 # held at the startup pose until the upper enable (in_enable_upper)
+
+# Simulation start-up: the robot spawns standing, so a short routine reaches the WBC-ready pose in
+# ~30 ticks instead of ~350, and the hold is released immediately rather than after a 60 s wait
+# measured in simulated time. The upper body still waits for the upper enable, so O toggles GR00T.
+sim_start_up:
+  sdk_joint_order: *g1_sdk_43 # 43-joint publisher command order
+  config_file: operators/start_up/config/g1_start_up_sim.yaml
+  auto_enable_delay: 0.0 # s holding the final pose before automatic enable (0 = immediate)
+  upper_body_joints: *g1_gr00t_upper_31 # held at the startup pose until the upper enable (in_enable_upper)

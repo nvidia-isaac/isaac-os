@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Doxygen configuration for Isaac OS.
+# Generates XML consumed by Sphinx/Breathe — HTML generation is disabled.
+# Run from the docs/ directory: doxygen Doxyfile
+
+PROJECT_NAME           = "Isaac OS"
+PROJECT_BRIEF          = "Isaac OS C++ API"
+
+# Directories to scan (relative to docs/).
+INPUT                  = ../applications \
+                         ../common \
+                         ../messages \
+                         ../operators
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h *.hpp *.cc *.cpp *.cu
+EXCLUDE_PATTERNS       = */tests/* */build/*
+
+# Output: XML only (Breathe reads XML, Sphinx renders HTML).
+OUTPUT_DIRECTORY       = _doxygen
+GENERATE_XML           = YES
+XML_OUTPUT             = xml
+XML_PROGRAMLISTING     = YES
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+
+# Extraction settings.
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+JAVADOC_AUTOBRIEF      = YES
+
+# Preprocessing: expand macros so Doxygen sees the full declarations.
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = YES
+PREDEFINED             = HOLOSCAN_OPERATOR_FORWARD_ARGS(x)=
+
+# Quieter output.
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO

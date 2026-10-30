@@ -1,0 +1,109 @@
+# ros2_bridge_reference
+
+Minimal reference application for [`common/ros2_bridge`](../../common/ros2_bridge/README.md).
+
+## What this app does
+
+`Ros2Bridge` is a C++ object, not an operator. Wire `to_ros2` and `from_ros2` in `compose()`, then call
+`bridge.start(...)` after `holoscan::compile()`.
+
+`PoseGeneratorOp` emits circular-motion `isaac.PoseCpu` messages at 20 Hz. `to_ros2` publishes
+them as `geometry_msgs/PoseStamped` on `/ros2_bridge_reference/pose_out`. `PoseRelayNode`, a
+separate `rclcpp::Node` in the same process, republishes them unchanged on
+`/ros2_bridge_reference/pose_in`; `from_ros2` delivers them to `PoseLoggerOp`.
+
+```mermaid
+flowchart LR
+    Gen([PoseGeneratorOp<br/>20 Hz]):::op
+    Pub(("to_ros2")):::bridge
+    OutTopic[/"/ros2_bridge_reference/pose_out"/]:::topic
+    Relay([PoseRelayNode<br/>external rclcpp::Node]):::ext
+    InTopic[/"/ros2_bridge_reference/pose_in"/]:::topic
+    Sub(("from_ros2")):::bridge
+    Log([PoseLoggerOp]):::op
+
+    Gen ==>|isaac.PoseCpu| Pub
+    Pub ==>|geometry_msgs/PoseStamped| OutTopic
+    OutTopic ==>|geometry_msgs/PoseStamped| Relay
+    Relay ==>|geometry_msgs/PoseStamped| InTopic
+    InTopic ==>|geometry_msgs/PoseStamped| Sub
+    Sub ==>|isaac.PoseCpu| Log
+
+    classDef op fill:#76B900,stroke:#3F8500,stroke-width:2px,color:#fff
+    classDef bridge fill:#1DBBA4,stroke:#0D8473,stroke-width:2px,color:#fff
+    classDef topic fill:#2E3440,stroke:#4C566A,stroke-width:2px,color:#fff
+    classDef ext fill:#8C1D9F,stroke:#5E1369,stroke-width:2px,color:#fff
+    linkStyle default stroke:#76B900,stroke-width:3px
+```
+
+Both `PoseGeneratorOp` and `PoseLoggerOp` count what they send/receive and log the total when the
+app stops, alongside `PoseRelayNode`'s own relayed count printed by `main.cc` — three independent
+tallies that should match, showing every message made it through the whole round trip.
+
+## GPU image path (automatic)
+
+When `ros2_bridge` is built with the CUDA buffer backend (the `cuda_buffer` package is installed)
+and the machine has a CUDA device, the app also round-trips a 640x480 `sensor_msgs/Image` through
+ROS2 as a CUDA buffer. The frame stays in GPU memory from the generator through ROS and back into
+the graph; `ImageCheckOp` copies it to the host only to verify the pixels. In a build without the
+backend, or on a machine without a GPU, the app is the pose round trip alone and warns that the
+image path was skipped.
+
+`ImageGeneratorOp` fills each frame on the GPU (every byte holds a value derived from the frame
+number) and emits it as an `ImageT` whose tensor is device memory. `to_ros2` publishes it as a CUDA
+buffer, `ImageRelayNode` (another external `rclcpp::Node`) subscribes with
+`acceptable_buffer_backends = "cuda"` and republishes the same message without copying it, and
+`from_ros2` brings it back as a device tensor for `ImageCheckOp`, which checks the size and the
+pixels.
+
+```mermaid
+flowchart LR
+    Gen([ImageGeneratorOp<br/>20 Hz, GPU]):::op
+    Pub(("to_ros2<br/>kCudaDevice")):::bridge
+    OutTopic[/"/ros2_bridge_reference/image_out"/]:::topic
+    Relay([ImageRelayNode<br/>external rclcpp::Node]):::ext
+    InTopic[/"/ros2_bridge_reference/image_in"/]:::topic
+    Sub(("from_ros2<br/>kCudaDevice")):::bridge
+    Check([ImageCheckOp]):::op
+
+    Gen ==>|ImageT, device tensor| Pub
+    Pub ==>|sensor_msgs/Image, CUDA buffer| OutTopic
+    OutTopic ==>|CUDA buffer| Relay
+    Relay ==>|CUDA buffer| InTopic
+    InTopic ==>|CUDA buffer| Sub
+    Sub ==>|ImageT, device tensor| Check
+
+    classDef op fill:#76B900,stroke:#3F8500,stroke-width:2px,color:#fff
+    classDef bridge fill:#1DBBA4,stroke:#0D8473,stroke-width:2px,color:#fff
+    classDef topic fill:#2E3440,stroke:#4C566A,stroke-width:2px,color:#fff
+    classDef ext fill:#8C1D9F,stroke:#5E1369,stroke-width:2px,color:#fff
+    linkStyle default stroke:#76B900,stroke-width:3px
+```
+
+A device topic needs two bindings when the graph is compiled, which `main.cc` shows: the
+generator's output (`bind_tensor_output_device`) and the imported topic (`bind_imported_topic_device`),
+both on the bridge's pool GPU. See the
+[`ros2_bridge` README](../../common/ros2_bridge/README.md#gpu-resident-images-memory_kind) for why.
+
+The app fails with an error in these cases:
+
+- The relay node receives an image in host memory. The ROS CUDA buffer backend plugin is not
+  installed in this process, so frames are copied down to the host instead of staying on the GPU.
+- The graph receives a tensor that is not in GPU memory, or an image with the wrong size, encoding
+  or pixels.
+- More than two images are missing. The generator's sent count and the graph's received count must
+  agree to within two frames, which are allowed to be still in transit when the graph stops.
+
+When the app stops it logs the sent, relayed and received image counts next to the pose counts.
+
+## Usage
+
+```bash
+./isaac_os run ros2_bridge_reference
+```
+
+Runs for 10 seconds by default; pass app flags after `--`:
+
+```bash
+./isaac_os run ros2_bridge_reference -- --duration-s=30
+```

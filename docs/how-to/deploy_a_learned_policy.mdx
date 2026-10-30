@@ -1,0 +1,129 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Deploy a learned policy
+
+<Note>
+A trained policy, such as a vision-language-action (VLA) model, only behaves as
+trained if it receives the same observations and its actions are read the same way.
+This guide pins down that model contract, picks an inference path, connects the
+policy and validates it in simulation before you use a physical robot.
+
+This guide does not cover low-level controllers or task planners. To connect
+robot state and commands first, see
+[Add a robot embodiment](/isaac-os/how-to/add-a-robot-embodiment).
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Deploy a learned policy" hidePrompt actions={["cursor"]}>
+Find the target application, the robot and the model export files in our
+conversation and project. Ask me for missing details.
+Follow [Deploy a learned policy](/isaac-os/how-to/deploy-a-learned-policy). Check
+the model contract and inference path. Then validate the policy without robot
+commands, and then in simulation.
+</Prompt>
+</llms-ignore>
+
+## Check the model contract
+
+A policy model receives observations and produces actions. Before you deploy
+an exported model, record these properties for each model file:
+
+- Input and output tensor names, shapes and data types.
+- Observation preprocessing: image crop, size, channel order, normalization,
+  and the order of state values.
+- Action meaning: joint order, units, and position or effort targets.
+- Action timing: the number of actions in each prediction and the time between
+  actions.
+
+Matching file names, joint counts or horizons is not sufficient. Compare each
+property with the application that runs the model. Export each model to ONNX.
+`InferenceOp` also accepts prebuilt TensorRT engines. Keep each ONNX
+external-data file at the path that its model references.
+
+<Info>
+**LEAPP exports:** LEAPP writes ONNX files and a metadata YAML that describes
+the tensors and their semantics. Isaac OS does not load or interpret this YAML.
+Use it as the reference for the contract above, and write the Isaac OS
+configuration manually. Isaac ROS loads the LEAPP YAML to build its inference
+graph; see
+[GR00T E2E deployment with Isaac ROS](https://docs.nvidia.com/learning/physical-ai/gr00t-e2e-workflow/latest/real-robot-workflow/real-deployment.html).
+</Info>
+
+## Select an inference path
+
+Run the model with one of these operators:
+
+- **Upstream Holoscan [`InferenceOp`][hsdk-inference]:** use it when the models
+  need TensorRT inference only. Put preprocessing and postprocessing in other
+  operators. `InferenceOp` builds or loads a TensorRT engine for each ONNX model
+  or prebuilt engine. It creates one port for each configured tensor, and it
+  reads its model and tensor maps from C++ or YAML. It is not validated in an
+  Isaac OS application yet.
+- **Custom operator:** use it when the policy needs preprocessing, a model chain
+  or action conversion that `InferenceOp` does not do, or when you want to fuse
+  these steps. Use `isaac::TensorRTEngine` from
+  [`common/tensorrt_engine`](../../common/tensorrt_engine) to build and cache
+  engines from ONNX.
+
+For reference custom operators, see
+[`operators/gr00t_n1_7`](../../operators/gr00t_n1_7) (five chained models, used
+in the [GR00T tutorials](/isaac-os/tutorials/gr00t-wbc)) and
+[`operators/so101_reach`](../../operators/so101_reach) (one model).
+
+<Accordion title="❓ Why does Isaac OS have its own GR00T operator?">
+
+Isaac OS built the GR00T operator before Holoscan SDK 5.0 improved the upstream
+`InferenceOp`. GR00T N1.7 uses five chained models. The backbone output goes
+into the action head, and the action head also needs a new noise input for each
+inference. The GR00T operator fuses image preparation, joint gather, the five
+TensorRT engines, action scatter, and output copies, and captures them in one
+CUDA graph. See
+[GPU execution](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#gpu-execution).
+
+The Holoscan SDK 5.0 `InferenceOp` supports multiple models, CUDA Graphs and
+several dispatch paths. When one `InferenceOp` runs chained models, it uses its
+general dispatch path; see [dispatch selection][hsdk-inference-dispatch].
+It is not evaluated as a replacement for the GR00T operator yet.
+
+</Accordion>
+
+## Connect the policy to the application
+
+Connect operators that supply observations, such as cameras and joint state,
+to the policy inputs. Connect the policy actions to the operators that send
+robot commands. Add preprocessing and postprocessing operators between them
+when the inference operator does not do these steps.
+
+Some differences need configuration changes only. Others need operator changes:
+
+| Difference | Change |
+| --- | --- |
+| Model paths, tensor bindings, joint order, gains or action timing that the operator reads from its configuration | Configuration |
+| New preprocessing, a different model chain, new action semantics or a new robot interface | Operator code |
+
+For the GR00T N1.7 operator, see the
+[model export contract](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#model-export-contract).
+It lists the model and application configuration files, the action chunk and
+joint message types, and how WBC combines the commands.
+
+## Validate the deployment
+
+Do each check before you go to the next one:
+
+1. Run the policy without robot commands. Make sure that the models load and
+   that the output shapes, value ranges and joint order are correct.
+2. Measure inference latency and action rate against the control budget. See
+   [Profile an Application](/isaac-os/how-to/profile-an-application) and
+   [Optimize an Application](/isaac-os/how-to/optimize-an-application).
+3. Run the task in simulation and observe the behavior.
+4. Run the task on the physical robot, with the robot in a safe area.
+
+For GR00T N1.7 on G1, do these checks with the
+[Simulation](/isaac-os/tutorials/gr00t-wbc/simulation) and
+[Real robot](/isaac-os/tutorials/gr00t-wbc/real-robot) tutorials.
+
+[hsdk-inference]: https://docs.nvidia.com/holoscan/sdk-user-guide/modules/inference
+[hsdk-inference-dispatch]: https://docs.nvidia.com/holoscan/sdk-user-guide/modules/inference#dispatch-selection

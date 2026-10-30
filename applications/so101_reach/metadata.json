@@ -1,0 +1,55 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "mock",
+    "description": "SO-101 reach policy with mock, real-arm and Isaac Sim modes.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0.1"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "mock": {
+        "description": "Run the 100 Hz mock arm and 50 Hz SO-101 TensorRT reach policy.",
+        "run": {
+          "command": "<isaac_app_bin>/mock/mock_so101_reach",
+          "workdir": "isaac_root"
+        }
+      },
+      "real": {
+        "description": "Run the SO-101 Feetech arm with the TensorRT reach policy.",
+        "run": {
+          "command": "<isaac_app_bin>/real/so101_reach_real",
+          "workdir": "isaac_root"
+        }
+      },
+      "sim": {
+        "description": "Run the SO-101 TensorRT reach policy in Isaac Sim over UCX.",
+        "run": {
+          "command": "<isaac_app_bin>/sim/so101_reach_sim",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "so101_reach",
+    "platforms": [
+      "x86_64",
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "tags": [
+      "robotics",
+      "testing"
+    ],
+    "version": "0.1.0"
+  }
+}

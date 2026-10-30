@@ -1,0 +1,16 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+
+namespace isaac;
+
+/// Six-axis SO101 state sampled from the serial bus.
+table StateSampleCpu {
+  position: [float] (id: 0, required);
+  velocity: [float] (id: 1, required);
+  source_sequence: ulong (id: 2);
+  fault_epoch: ulong (id: 3);
+}
+
+root_type StateSampleCpu;
+file_identifier "ISSS";

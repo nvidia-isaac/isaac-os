@@ -1,0 +1,20 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+native_include "Eigen/Dense";
+native_include "common/math_cpu_messages/matrix3x4d_adapter.h";
+
+namespace isaac;
+
+// Row-major 3x4 double-precision matrix, native_type-backed by
+// Eigen::Matrix<double, 3, 4, Eigen::RowMajor> -- explicitly row-major (Eigen defaults to
+// column-major) so its in-memory layout matches the wire layout exactly, letting Pack/UnPack
+// reinterpret the buffer directly (Eigen::Map) instead of copying element-by-element. No
+// fixed-size 3x4 type exists anywhere in the Holoscan SDK's own schemas; this covers that shape
+// (e.g. a camera projection matrix) and is reusable wherever else it shows up.
+struct Matrix3x4d (
+  native_type: "Eigen::Matrix<double, 3, 4, Eigen::RowMajor>",
+  native_default: "Eigen::Matrix<double, 3, 4, Eigen::RowMajor>::Zero()"
+) {
+  m: [double:12];
+}

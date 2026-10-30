@@ -1,0 +1,617 @@
+#!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+set -euo pipefail
+
+# -- constants ---------------------------------------------------------------
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOL_DIR="$REPO_ROOT/tools/isaac-sim-ucx"
+DISPLAY_COMMAND="$(basename "$0")"
+DOCKER_BIN="${DOCKER_BIN:-docker}"
+APP_FILENAME="isaac_sim_ucx.py"
+ENTRYPOINT_FILENAME="isaac_sim_entrypoint.sh"
+DEFAULT_IMAGE="nvcr.io/nvidia/isaac-sim:6.2.0.1"
+DEFAULT_SOURCE_IMAGE_REPO="isaac-sim-docker"
+DEFAULT_CACHE_ROOT="$HOME/docker/isaac-sim"
+CONTAINER_USER="$(id -u):1234" # 1234 is isaac-sim user and group id
+HOST_PASSWD_PATH="/etc/passwd"
+CONTAINER_APP_DIR="/$(basename "$TOOL_DIR")"
+CONTAINER_ASSET_ROOT="$CONTAINER_APP_DIR/assets"
+HOST_APP_PATH="$TOOL_DIR/$APP_FILENAME"
+HOST_ENTRYPOINT_PATH="$TOOL_DIR/$ENTRYPOINT_FILENAME"
+CONTAINER_APP_PATH="$CONTAINER_APP_DIR/$APP_FILENAME"
+CONTAINER_ENTRYPOINT_PATH="$CONTAINER_APP_DIR/$ENTRYPOINT_FILENAME"
+ISAAC_SIM_ROOT="/isaac-sim"
+ISAAC_SIM_PYTHON="$ISAAC_SIM_ROOT/python.sh"
+X11_SOCKET="/tmp/.X11-unix"
+CACHE_PATHS=(
+    ".cache"
+    ".config"           # For matplotlib, to handle non-1234 user
+    ".nv"
+    ".nvidia-omniverse" # logs, config, but also pycache to handle non-1234 user
+    ".local/share/ov"
+    "kit/cache"         # Needed for the main (and slow) shader cache
+    "kit/data"          # Needed to handle non-1234 user
+    "kit/logs"
+)
+SOURCE_BUILD_SCRIPTS=(
+    "tools/docker/prep_docker_build.sh"
+    "tools/docker/build_docker.sh"
+)
+
+# -- output ------------------------------------------------------------------
+
+usage() {
+    cat <<EOF
+Usage:
+  $DISPLAY_COMMAND run [options] [-- extra $APP_FILENAME args]
+  $DISPLAY_COMMAND warmup [options]
+  $DISPLAY_COMMAND build --from-source PATH [options]
+  $DISPLAY_COMMAND shell [options]
+
+Commands:
+  run         Run $APP_FILENAME in an Isaac Sim container.
+  warmup      Populate mounted Isaac Sim caches, then exit.
+  build       Build the Isaac Sim image from an IsaacSim source checkout.
+  shell       Open a Bash shell in the Isaac Sim container with the same mounts.
+
+Common options:
+  --image IMAGE          Isaac Sim image to run (default: $DEFAULT_IMAGE).
+  --from-source PATH     IsaacSim source checkout. Required by build; with run,
+                         builds and selects its commit image tag.
+  --source-image NAME    Source image repository name (default: $DEFAULT_SOURCE_IMAGE_REPO).
+  --cache-root PATH      Host cache root (default: $DEFAULT_CACHE_ROOT).
+  -s, --scene PATH       Host USD scene file to load. Omit to run without assets.
+  --privacy-consent      Opt in to NVIDIA telemetry.
+  -y, --accept-eula      Set ACCEPT_EULA=Y for Isaac Sim commands.
+  --dry-run              Print the Docker command instead of executing it.
+  -h, --help             Show this help.
+
+Docker options:
+  Unrecognized options before -- are passed to docker run after wrapper
+  defaults, so explicit Docker options override wrapper defaults where Docker
+  allows it.
+
+Python options:
+  Pass $APP_FILENAME options after --, for example:
+    $DISPLAY_COMMAND run --scene scene.usd -- --port 50009 --sim-dt 0.01
+
+EOF
+}
+
+die() {
+    echo "error: $*" >&2
+    exit 1
+}
+
+use_color() {
+    [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]]
+}
+
+use_tty() {
+    [[ -t 0 && -t 1 ]]
+}
+
+print_command() {
+    printf '> '
+    use_color && printf '\033[2m'
+    local arg
+    for arg in "$@"; do
+        printf '%s' "$arg"
+        printf ' '
+    done
+    use_color && printf '\033[0m'
+    printf '\n'
+}
+
+print_cache_root() {
+    if use_color; then
+        printf '\033[1mIsaac Sim cache root:\033[0m %s\n' "$CACHE_ROOT"
+    else
+        printf 'Isaac Sim cache root: %s\n' "$CACHE_ROOT"
+    fi
+}
+
+run_or_print_command() {
+    print_command "$@"
+    if is_true "$DRY_RUN"; then
+        return
+    fi
+    "$@"
+}
+
+# -- helpers -----------------------------------------------------------------
+
+is_true() {
+    case "$1" in
+        true|1|yes|Y|y)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+realpath_existing() {
+    local path="$1"
+    [[ -e "$path" ]] || die "path does not exist: $path"
+    realpath "$path"
+}
+
+realpath_for_mount() {
+    local path="$1"
+    if is_true "$DRY_RUN"; then
+        realpath -m "$path"
+    else
+        realpath_existing "$path"
+    fi
+}
+
+# -- display -----------------------------------------------------------------
+
+cleanup_display_xauth() {
+    if [[ -n "${DISPLAY_XAUTH_FILE:-}" ]]; then
+        run_or_print_command rm -f "$DISPLAY_XAUTH_FILE"
+    fi
+}
+
+is_local_x11_display() {
+    case "${DISPLAY:-}" in
+        :*|unix:*|unix/:*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+prepare_display_access() {
+    [[ -n "${DISPLAY:-}" ]] || return 0
+
+    if is_local_x11_display && [[ -d "$X11_SOCKET" ]]; then
+        MOUNT_X11_SOCKET=true
+    fi
+
+    # Copy the cookie to a temporary file so Docker mounts a stable auth file
+    # for both local and SSH-forwarded X11 displays.
+    if command -v xauth >/dev/null 2>&1; then
+        if is_true "$DRY_RUN"; then
+            XAUTHORITY_MOUNT="${TMPDIR:-/tmp}/.docker.xauth.DRYRUN"
+            print_command xauth -f "$XAUTHORITY_MOUNT" nmerge "<cookie-from-$DISPLAY>"
+            return 0
+        fi
+
+        local xauth_data
+        if xauth_data="$(xauth nlist "$DISPLAY" 2>/dev/null)" && [[ -n "$xauth_data" ]]; then
+            local xauth_file
+            xauth_file="$(umask 077 && mktemp "${TMPDIR:-/tmp}/.docker.xauth.XXXXXX")"
+            # Keep the real cookie out of logs while still showing the command
+            # that mutates the temporary xauth file.
+            print_command xauth -f "$xauth_file" nmerge "<cookie-from-$DISPLAY>"
+            if printf '%s\n' "$xauth_data" | sed -e 's/^..../ffff/' | \
+                xauth -f "$xauth_file" nmerge - 2>/dev/null; then
+                DISPLAY_XAUTH_FILE="$xauth_file"
+                XAUTHORITY_MOUNT="$xauth_file"
+                trap cleanup_display_xauth EXIT
+                return 0
+            fi
+            run_or_print_command rm -f "$xauth_file"
+            echo "warning: xauth nmerge failed for DISPLAY=$DISPLAY; X11 may not authenticate inside the container." >&2
+        else
+            echo "warning: xauth nlist returned no entries for DISPLAY=$DISPLAY; X11 may not authenticate inside the container." >&2
+        fi
+    else
+        echo "warning: xauth not found on host; X11 may not authenticate inside the container." >&2
+    fi
+
+    is_local_x11_display || return 0
+    command -v xhost >/dev/null 2>&1 || return 0
+    print_command xhost +local:docker
+    if is_true "$DRY_RUN"; then
+        return
+    fi
+    if ! xhost +local:docker >/dev/null 2>&1; then
+        echo "warning: xhost +local:docker failed; GUI access may not work." >&2
+    fi
+}
+
+append_display_docker_args() {
+    [[ -n "${DISPLAY:-}" ]] || return 0
+
+    DOCKER_ARGS+=(--env "DISPLAY=$DISPLAY")
+    if [[ -n "${XDG_SESSION_TYPE:-}" ]]; then
+        DOCKER_ARGS+=(--env "XDG_SESSION_TYPE=$XDG_SESSION_TYPE")
+    else
+        DOCKER_ARGS+=(--env XDG_SESSION_TYPE=x11)
+    fi
+    if [[ "$MOUNT_X11_SOCKET" == true ]]; then
+        DOCKER_ARGS+=(--volume "$X11_SOCKET:$X11_SOCKET:ro")
+    fi
+    if [[ -n "$XAUTHORITY_MOUNT" ]]; then
+        DOCKER_ARGS+=(--env "XAUTHORITY=$XAUTHORITY_MOUNT")
+        DOCKER_ARGS+=(--volume "$XAUTHORITY_MOUNT:$XAUTHORITY_MOUNT:ro")
+    elif [[ -n "${XAUTHORITY:-}" && -f "${XAUTHORITY:-}" ]]; then
+        DOCKER_ARGS+=(--env "XAUTHORITY=$XAUTHORITY")
+        DOCKER_ARGS+=(--volume "$XAUTHORITY:$XAUTHORITY:ro")
+    fi
+}
+
+# -- options -----------------------------------------------------------------
+
+parse_options() {
+    IMAGE="${ISAAC_SIM_IMAGE:-$DEFAULT_IMAGE}"
+    IMAGE_OPTION_SET=false
+    SOURCE_IMAGE_REPO="${ISAAC_SIM_SOURCE_IMAGE_REPO:-$DEFAULT_SOURCE_IMAGE_REPO}"
+    SOURCE_REPO=""
+    CACHE_ROOT="${ISAAC_SIM_CACHE_ROOT:-$DEFAULT_CACHE_ROOT}"
+    ASSET_ROOT=""
+    SCENE_PATH=""
+    CONTAINER_SCENE_PATH=""
+    ACCEPT_EULA=""
+    PRIVACY_CONSENT=false
+    DRY_RUN=false
+    MOUNT_X11_SOCKET=false
+    XAUTHORITY_MOUNT=""
+    DISPLAY_XAUTH_FILE=""
+    DOCKER_EXTRA_ARGS=()
+    EXTRA_ARGS=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --image)
+                IMAGE="${2:?missing value for --image}"
+                IMAGE_OPTION_SET=true
+                shift 2
+                ;;
+            --from-source)
+                SOURCE_REPO="${2:?missing value for --from-source}"
+                shift 2
+                ;;
+            --source-image)
+                SOURCE_IMAGE_REPO="${2:?missing value for --source-image}"
+                shift 2
+                ;;
+            --cache-root)
+                CACHE_ROOT="${2:?missing value for --cache-root}"
+                shift 2
+                ;;
+            -s|--scene)
+                SCENE_PATH="${2:?missing value for $1}"
+                shift 2
+                ;;
+            --privacy-consent)
+                PRIVACY_CONSENT=true
+                shift
+                ;;
+            -y|--accept-eula)
+                ACCEPT_EULA="Y"
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --)
+                shift
+                EXTRA_ARGS=("$@")
+                break
+                ;;
+            *)
+                DOCKER_EXTRA_ARGS+=("$1")
+                shift
+                ;;
+        esac
+    done
+}
+
+validate_options() {
+    local command="$1"
+
+    if [[ -n "$SOURCE_REPO" && "$IMAGE_OPTION_SET" == true ]]; then
+        die "--from-source cannot be combined with --image"
+    fi
+    if [[ "$SOURCE_IMAGE_REPO" == *@* || "${SOURCE_IMAGE_REPO##*/}" == *:* ]]; then
+        die "--source-image must be an image repository name without a tag or digest"
+    fi
+
+    case "$command" in
+        build)
+            [[ -n "$SOURCE_REPO" ]] || die "build requires --from-source <isaacsim-repo>"
+            [[ ${#DOCKER_EXTRA_ARGS[@]} -eq 0 ]] || \
+                die "Docker passthrough arguments are only supported by run, warmup, and shell"
+            ;;
+        run)
+            ;;
+        warmup|shell)
+            [[ -z "$SOURCE_REPO" ]] || die "--from-source is only supported by run and build"
+            ;;
+    esac
+}
+
+# -- paths -------------------------------------------------------------------
+
+normalize_paths() {
+    CACHE_ROOT="$(realpath -m "$CACHE_ROOT")"
+    if [[ -n "$SOURCE_REPO" ]]; then
+        SOURCE_REPO="$(realpath_existing "$SOURCE_REPO")"
+    fi
+}
+
+# -- image tags --------------------------------------------------------------
+
+git_branch_slug() {
+    local branch
+    branch="$(git -C "$SOURCE_REPO" branch --show-current 2>/dev/null || true)"
+    if [[ -z "$branch" ]]; then
+        branch="detached-$(git -C "$SOURCE_REPO" rev-parse --short=12 HEAD)"
+    fi
+    branch="$(printf '%s' "$branch" | sed -E 's/[^A-Za-z0-9_.-]+/-/g; s/^-+//; s/-+$//')"
+    if [[ -z "$branch" ]]; then
+        branch="unknown"
+    fi
+    echo "$branch"
+}
+
+git_commit_sha() {
+    git -C "$SOURCE_REPO" rev-parse --short=12 HEAD
+}
+
+tag_if_needed() {
+    local source_tag="$1"
+    local target_tag="$2"
+    if [[ "$source_tag" != "$target_tag" ]]; then
+        run_or_print_command "$DOCKER_BIN" tag "$source_tag" "$target_tag"
+    fi
+}
+
+# -- source build ------------------------------------------------------------
+
+require_isaacsim_source_repo() {
+    local script
+    for script in "${SOURCE_BUILD_SCRIPTS[@]}"; do
+        [[ -x "$SOURCE_REPO/$script" ]] || \
+            die "$SOURCE_REPO does not look like an IsaacSim repo"
+    done
+}
+
+build_source_image() {
+    require_isaacsim_source_repo
+
+    local branch_image="$SOURCE_IMAGE_REPO:$(git_branch_slug)"
+    local commit_image="$SOURCE_IMAGE_REPO:$(git_commit_sha)"
+    local latest_image="$SOURCE_IMAGE_REPO:latest"
+
+    echo "==> Building Isaac Sim and preparing Docker context from $SOURCE_REPO"
+    (
+        cd "$SOURCE_REPO"
+        if is_true "$ACCEPT_EULA"; then
+            run_or_print_command env ACCEPT_EULA=Y ./tools/docker/prep_docker_build.sh --build
+        else
+            run_or_print_command ./tools/docker/prep_docker_build.sh --build
+        fi
+        run_or_print_command ./tools/docker/build_docker.sh --tag "$commit_image"
+    )
+
+    tag_if_needed "$commit_image" "$latest_image"
+    tag_if_needed "$commit_image" "$branch_image"
+}
+
+# -- runtime image -----------------------------------------------------------
+
+prepare_run_image() {
+    RUN_IMAGE="$IMAGE"
+    if [[ -z "$SOURCE_REPO" ]]; then
+        return
+    fi
+
+    RUN_IMAGE="$SOURCE_IMAGE_REPO:$(git_commit_sha)"
+}
+
+# -- caches ------------------------------------------------------------------
+
+set_cache_host_dirs() {
+    CACHE_HOST_DIRS=()
+    local path
+    for path in "${CACHE_PATHS[@]}"; do
+        CACHE_HOST_DIRS+=("$CACHE_ROOT/$path")
+    done
+}
+
+exit_with_cache_setup_error() {
+    local reason="$1"
+
+    set_cache_host_dirs
+    die "$reason Use '--cache-root <path>' to use a different cache directory, or update the current cache root permissions with:
+
+  sudo mkdir -p ${CACHE_HOST_DIRS[@]} && \\
+  sudo chown -R $CONTAINER_USER $CACHE_ROOT"
+}
+
+prepare_cache_dirs() {
+    set_cache_host_dirs
+
+    if [[ -e "$CACHE_ROOT" && ! -d "$CACHE_ROOT" ]]; then
+        exit_with_cache_setup_error "$CACHE_ROOT exists but is not a directory."
+    fi
+
+    if ! run_or_print_command mkdir -p "${CACHE_HOST_DIRS[@]}" 2>/dev/null; then
+        exit_with_cache_setup_error "cannot create or update Isaac Sim cache directories under $CACHE_ROOT."
+    fi
+
+    local dir
+    for dir in "${CACHE_HOST_DIRS[@]}"; do
+        if [[ ! -w "$dir" ]]; then
+            exit_with_cache_setup_error "$dir is not writable by '$(id -nu):$(id -ng)'."
+        fi
+    done
+}
+
+# -- assets ------------------------------------------------------------------
+
+resolve_asset_paths() {
+    CONTAINER_SCENE_PATH=""
+    local rel_path=""
+
+    if [[ -z "$SCENE_PATH" ]]; then
+        return
+    fi
+
+    local scene_real
+    scene_real="$(realpath_for_mount "$SCENE_PATH")"
+    ASSET_ROOT="$(dirname "$scene_real")"
+    rel_path="$(basename "$scene_real")"
+
+    CONTAINER_SCENE_PATH="$CONTAINER_ASSET_ROOT/$rel_path"
+}
+
+# -- docker args -------------------------------------------------------------
+
+append_common_docker_args() {
+    # Base
+    DOCKER_ARGS=(run --rm --init --network host)
+
+    # GPU
+    DOCKER_ARGS+=(--gpus all --env NVIDIA_DRIVER_CAPABILITIES=all)
+
+    # Entrypoint
+    DOCKER_ARGS+=(--volume "$HOST_ENTRYPOINT_PATH:$CONTAINER_ENTRYPOINT_PATH:ro")
+    DOCKER_ARGS+=(--env "ISAAC_SIM_LAUNCHER=$DISPLAY_COMMAND")
+    if is_true "$ACCEPT_EULA"; then
+        DOCKER_ARGS+=(--env ACCEPT_EULA=Y)
+    fi
+    if is_true "$PRIVACY_CONSENT"; then
+        DOCKER_ARGS+=(--env PRIVACY_CONSENT=Y)
+        DOCKER_ARGS+=(--env OMNI_ENV_PRIVACY_CONSENT=Y)
+    fi
+
+    # Cache
+    local path
+    for path in "${CACHE_PATHS[@]}"; do
+        DOCKER_ARGS+=(--volume "$CACHE_ROOT/$path:$ISAAC_SIM_ROOT/$path:rw")
+    done
+
+    # User
+    DOCKER_ARGS+=(--user "$CONTAINER_USER")
+    DOCKER_ARGS+=(--env "HOME=$ISAAC_SIM_ROOT") # To handle non-1234 user
+    DOCKER_ARGS+=(--volume "$HOST_PASSWD_PATH:/etc/passwd:ro")
+    DOCKER_ARGS+=(--workdir "$CONTAINER_APP_DIR")
+
+    # Display
+    append_display_docker_args
+
+    # App
+    DOCKER_ARGS+=(--volume "$HOST_APP_PATH:$CONTAINER_APP_PATH:ro")
+    if [[ -n "$ASSET_ROOT" ]]; then
+        DOCKER_ARGS+=(--volume "$ASSET_ROOT:$CONTAINER_ASSET_ROOT:ro")
+    fi
+}
+
+# -- commands ----------------------------------------------------------------
+
+run_python_container() {
+    local warmup_only="$1"
+
+    normalize_paths
+    print_cache_root
+    resolve_asset_paths
+    if [[ -n "$SOURCE_REPO" ]] && ! is_true "$DRY_RUN"; then
+        build_source_image
+    fi
+    if ! is_true "$DRY_RUN"; then
+        prepare_cache_dirs
+    fi
+    prepare_display_access
+    prepare_run_image
+
+    append_common_docker_args
+    if use_tty; then
+        DOCKER_ARGS+=(--interactive)
+        DOCKER_ARGS+=(--tty)
+    fi
+
+    local python_args=("$CONTAINER_APP_PATH")
+    if [[ -n "$CONTAINER_SCENE_PATH" ]]; then
+        python_args+=(--scene "$CONTAINER_SCENE_PATH")
+    fi
+    if [[ -z "${DISPLAY:-}" ]]; then
+        python_args+=(--headless)
+    fi
+    if is_true "$warmup_only"; then
+        python_args+=(--warmup)
+    fi
+    python_args+=("${EXTRA_ARGS[@]}")
+
+    local command=("$DOCKER_BIN" "${DOCKER_ARGS[@]}" --entrypoint "$CONTAINER_ENTRYPOINT_PATH")
+    command+=("${DOCKER_EXTRA_ARGS[@]}" "$RUN_IMAGE")
+    command+=("$ISAAC_SIM_PYTHON")
+    command+=("${python_args[@]}")
+
+    run_or_print_command "${command[@]}"
+}
+
+run_shell_container() {
+    normalize_paths
+    print_cache_root
+    resolve_asset_paths
+    if ! is_true "$DRY_RUN"; then
+        prepare_cache_dirs
+    fi
+    prepare_display_access
+    prepare_run_image
+
+    append_common_docker_args
+    DOCKER_ARGS+=(--interactive)
+    if use_tty; then
+        DOCKER_ARGS+=(--tty)
+    fi
+    DOCKER_ARGS+=(--entrypoint "$CONTAINER_ENTRYPOINT_PATH")
+    DOCKER_ARGS+=("${DOCKER_EXTRA_ARGS[@]}")
+
+    local command=("$DOCKER_BIN" "${DOCKER_ARGS[@]}" "$RUN_IMAGE")
+    command+=("/bin/bash")
+    run_or_print_command "${command[@]}"
+}
+
+# -- main --------------------------------------------------------------------
+
+main() {
+    local command="${1:-}"
+    if [[ -z "$command" || "$command" == "-h" || "$command" == "--help" ]]; then
+        usage
+        exit 0
+    fi
+    shift
+
+    parse_options "$@"
+    validate_options "$command"
+
+    case "$command" in
+        run)
+            run_python_container false
+            ;;
+        warmup)
+            run_python_container true
+            ;;
+        build)
+            normalize_paths
+            build_source_image
+            ;;
+        shell)
+            run_shell_container
+            ;;
+        *)
+            die "unknown command: $command"
+            ;;
+    esac
+}
+
+main "$@"

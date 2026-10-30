@@ -1,0 +1,48 @@
+# HoloHub CLI (downloaded by isaac_os on first run)
+.holohub/
+.sdk/
+.nv/
+.venv/
+
+# CMake build directories
+build/
+build-*/
+cmake-build/
+
+# Host-local compilation DB (see tools/rewrite_compile_commands_for_host.py)
+compile_commands.host.json
+compile_commands.json
+.clangd
+
+# Cache
+.cache/
+
+# Container artifacts
+.bash_history
+.cupy/
+
+# Generated files
+__pycache__/
+*.egg-info/
+
+# Downloaded resources (policy models, etc.)
+data/
+
+# MCAP output from the encoded-video logging and replay workflow
+/output/
+
+# Default MCAP output from mcap_logger_reference (applications/mcap_logger_reference)
+/mcap_logger_output/
+
+# ROS
+.ros/
+
+
+
+# Documentation build artifacts
+docs/_build/
+docs/_doxygen/
+docs/api/python/
+
+# Holoscan data-flow tracking / benchmark metrics (written to the working dir at runtime)
+*_dataflow_tracking_*

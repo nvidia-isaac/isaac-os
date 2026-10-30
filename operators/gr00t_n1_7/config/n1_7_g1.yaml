@@ -1,0 +1,131 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Embodiment config for Gr00tN17InferenceOp on the Unitree G1 humanoid.
+#
+# Checkpoint: nvidia/GR00T-N1.7-ApplePnP-V1 at refs/pr/2.
+# Binding names and shapes below were confirmed from the exported ONNX models, opsets 17/18.
+#
+# ── Latent dims (fixed for all N1.7 checkpoints) ──────────────────────────────
+#   max_state_dim      = 132   (state/action latent width)
+#   max_action_horizon = 40    (internal latent horizon; noise.initial dim-1)
+#   chunk_size         = 16    (decode_action output horizon, dim-1)
+# action_head runs the COMPLETE flow-matching denoising loop internally (one call/tick).
+#
+# ── State groups (43 physical dims, from in_state_tensormap) ──────────────────
+#   left_leg[6] right_leg[6] waist[3] left_arm[7] right_arm[7] left_hand[7] right_hand[7]
+# decode_action only outputs the upper body it controls (legs come from the WBC policy via the
+# combiner): left_arm[7] right_arm[7] left_hand[7] right_hand[7] waist[3] = 31 controlled joints.
+#
+# ⚠ JOINT ORDER: the intra-group joint order here is assumed to match the SDK order
+#   (g1_sdk_43). This must equal the checkpoint's training order. Confirm with Billy Okal
+#   before trusting motion. A silent reorder is the classic G1 failure mode.
+#
+# ── Symbol namespace ──────────────────────────────────────────────────────────
+#   input.video.<cam>  → named tensor from in_video_tensor port (float32 [1,480,640,3])
+#   input.state.<key>  → named key from in_state_tensormap port
+#   output.<key>       → key written into out_action_tensormap (BlockMemoryPool/allocator)
+#   stage.<name>       → intermediate device buffer allocated at init
+#   noise.initial      → Gaussian noise [1, 40, 132] filled via curand each tick
+#   _unused_<name>     → TRT output allocated for I/O sizing, not consumed downstream
+
+gr00t_n1_7:
+  num_joints: 43 # G1: 29 body (12 leg + 3 waist + 14 arm) + 14 hand
+  chunk_size: 16 # decode_action output horizon (informational; outputs sized from TRT bindings)
+  max_action_horizon: 40 # fixed for all N1.7 embodiments
+  max_state_dim: 132 # fixed for all N1.7 embodiments
+
+  noise_seed: 0 # 0 = seed once from wall-clock at startup (non-deterministic); non-zero = deterministic seed
+
+  # ── Sub-model pipeline (5 TRT models, run in order on one CUDA stream) ───────
+  # This export bakes image_grid_thw as a compile-time constant (fixed 480x640 → 16x16 = 256 patches),
+  # so there is NO shape tensor and NO ONNX surgery; the raw LEAPP export loads into TRT directly.
+  models:
+    # Model 0: preprocess_video converts a float32 ego-view image to VLM tokens.
+    - path: data/gr00t_n1_7/g1_apple_to_plate/preprocess_video.onnx
+      inputs:
+        ego_view: "input.video.ego_view" # float32 [1, 480, 640, 3], raw 0-255
+      outputs:
+        pixel_values: "stage.pixel_values" # float [256, 1536]
+        input_ids: "stage.input_ids" # int64 [1, 77]
+        attention_mask: "stage.attention_mask" # int64 [1, 77]
+        embodiment_id: "stage.embodiment_id" # int64 [1]
+
+    # Model 1: preprocess_state converts per-group joint state to a normalized latent + references.
+    # Only left_arm / right_arm references survive into decode_action; the rest are optimized
+    # away downstream and routed to _unused_ (still allocated to satisfy TRT I/O).
+    - path: data/gr00t_n1_7/g1_apple_to_plate/preprocess_state.onnx
+      inputs:
+        left_leg: "input.state.left_leg" # [1, 6]
+        right_leg: "input.state.right_leg" # [1, 6]
+        waist: "input.state.waist" # [1, 3]
+        left_arm: "input.state.left_arm" # [1, 7]
+        right_arm: "input.state.right_arm" # [1, 7]
+        left_hand: "input.state.left_hand" # [1, 7]
+        right_hand: "input.state.right_hand" # [1, 7]
+      outputs:
+        state: "stage.state" # float [1, 1, 132]
+        reference_0_left_arm: "stage.reference_0_left_arm" # [1, 7] → decode_action
+        reference_0_right_arm: "stage.reference_0_right_arm" # [1, 7] → decode_action
+        # Only the arm references feed decode_action (state_0_{left,right}_arm) to make the arm
+        # outputs absolute. The leg/waist/hand references are produced by the model but not consumed
+        # downstream, so they are routed to _unused_ scratch buffers (allocated for TRT I/O only).
+        reference_0_left_leg: "_unused_reference_0_left_leg"
+        reference_0_right_leg: "_unused_reference_0_right_leg"
+        reference_0_waist: "_unused_reference_0_waist"
+        reference_0_left_hand: "_unused_reference_0_left_hand"
+        reference_0_right_hand: "_unused_reference_0_right_hand"
+
+    # Model 2: backbone VLM forward (binding names identical across embodiments).
+    - path: data/gr00t_n1_7/g1_apple_to_plate/backbone.onnx
+      inputs:
+        vl_input_input_ids: "stage.input_ids"
+        vl_input_attention_mask: "stage.attention_mask"
+        vl_input_pixel_values: "stage.pixel_values"
+      outputs:
+        converted_outputs_backbone_features: "stage.backbone_features" # float [1, 77, 2048]
+        converted_outputs_backbone_attention_mask: "stage.backbone_attention_mask" # int32 [1, 77]
+        converted_outputs_image_mask: "stage.image_mask" # int32 [1, 77]
+
+    # Model 3: action_head runs the full denoising loop and consumes Gaussian noise once/tick. This
+    # export takes only the backbone features + state + noise (the raw VLM tokens/pixels and
+    # image_grid_thw are no longer re-consumed here).
+    - path: data/gr00t_n1_7/g1_apple_to_plate/action_head.onnx
+      inputs:
+        backbone_outputs_backbone_features: "stage.backbone_features"
+        backbone_outputs_backbone_attention_mask: "stage.backbone_attention_mask"
+        backbone_outputs_image_mask: "stage.image_mask"
+        action_inputs_state: "stage.state"
+        action_inputs_embodiment_id: "stage.embodiment_id"
+        initial_noise: "noise.initial" # float [1, 40, 132]
+      outputs:
+        output1_action_pred: "stage.action_pred" # float [1, 40, 132]
+        output1_backbone_features: "_unused_backbone_features"
+        output1_state_features: "_unused_state_features" # [1, 1, 1536]
+
+    # Model 4: decode_action de-normalizes to physical joint space. We keep the position groups
+    # (arms/hands/waist); navigate_command, base_height_command and effort_* are intentionally
+    # dropped to _unused_ for first bring-up. base_height target is applied downstream as a
+    # constant 0.70 (no consumer in the velocity-WBC pipeline yet; see app config).
+    - path: data/gr00t_n1_7/g1_apple_to_plate/decode_action.onnx
+      inputs:
+        normalized_action: "stage.action_pred"
+        state_0_left_arm: "stage.reference_0_left_arm" # [1, 7]
+        state_0_right_arm: "stage.reference_0_right_arm" # [1, 7]
+      outputs:
+        left_arm: "output.left_arm" # [1, 16, 7]
+        right_arm: "output.right_arm" # [1, 16, 7]
+        left_hand: "output.left_hand" # [1, 16, 7]
+        right_hand: "output.right_hand" # [1, 16, 7]
+        waist: "output.waist" # [1, 16, 3]
+        navigate_command: "_unused_navigate_command" # [1, 16, 3]
+        base_height_command: "_unused_base_height_command" # [1, 16, 1] (forced 0.70 downstream)
+        # Route the model's per-joint effort (torque) outputs into the action tensormap so they reach
+        # the postprocessor. First just for inspection (they show up as UNMAPPED groups in the
+        # postprocessor debug print); wired into the JointCommandT.effort field as a follow-up once
+        # the magnitudes look sane. The ROS reference stack drives these torques.
+        effort_left_arm: "output.effort_left_arm" # [1, 16, 7]
+        effort_right_arm: "output.effort_right_arm" # [1, 16, 7]
+        effort_left_hand: "output.effort_left_hand" # [1, 16, 7]
+        effort_right_hand: "output.effort_right_hand" # [1, 16, 7]
+        effort_waist: "output.effort_waist" # [1, 16, 3]

@@ -1,0 +1,195 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Isaac OS and ROS 2
+
+<Note>
+ROS 2 concepts don't map one-to-one to Isaac OS: a node is not an operator, and a
+topic is not a port. This page compares them, to help you port a ROS 2 component
+or bridge the two.
+</Note>
+
+Isaac OS and [Isaac ROS](https://nvidia-isaac-ros.github.io/) are complementary frameworks on
+the NVIDIA robotics platform, each suited to different application needs. Isaac ROS brings GPU
+acceleration and AI to the ROS 2 ecosystem, so you can speed up existing ROS 2 applications.
+Isaac OS is built on [NVIDIA's Holoscan platform](https://holoscan.org) and provides
+deterministic execution from sensing to AI inference to control. You can use the two together
+through the [ROS 2 Bridge](/isaac-os/how-to/connect-a-ros-2-graph).
+
+This page refers to the [Holoscan SDK](https://www.holoscan.org/sdk/) 5 API that Isaac OS
+uses. For the Isaac OS vocabulary itself, see [Isaac OS concepts](/isaac-os/explanation/isaac-os-basics).
+
+## At a glance
+
+| ROS 2 | Isaac OS | How close |
+| --- | --- | --- |
+| Node | Operator | Partial |
+| Publisher, subscription | Output port, input port | Close |
+| Topic | Edge between two ports, inside a graph. Imported or exported topic, at the graph boundary. | Partial |
+| Message type (`.msg`) | FlatBuffers schema | Close |
+| The ROS graph, formed by discovery | Graph, declared and compiled | Different |
+| Subscription callback, timer | Operator trigger | Partial |
+| QoS | Edge queue options | Partial |
+| Executor and callback group | Execution partition | Partial |
+| Where nodes run, set at deployment | Process layout recorded in the compiled plan | Different |
+
+## Node and operator
+
+A ROS 2 node is a participant in the ROS graph. It can own publishers, subscriptions, timers,
+services and parameters, and it is usually a process, though several nodes can share one.
+
+An Isaac OS operator is a unit of computation inside a graph. It declares typed input and
+output ports and a rule for when it runs, and it does its work in one `compute()` step.
+An operator can have several inputs and outputs, as a node can have several publishers and
+subscriptions.
+
+They are alike in being the basic unit of work that you name, give typed connections and reuse.
+They differ in what they own. An operator has no discovery, naming or middleware presence of
+its own, because it exists only inside a graph. A node is a participant on the network
+whether or not other nodes use it.
+
+The two systems group these units differently. ROS 2 groups nodes when you launch them.
+Holoscan groups operators in reusable graphs with exported ports. Isaac OS also uses helper
+functions that add operator groups to a parent graph, as described in
+[application composition](/isaac-os/explanation/isaac-os-basics#application-composition).
+
+## Topics, ports and messages
+
+In ROS 2 a topic is a named channel. Any node can publish or subscribe to it by name and
+type, and neither side needs to know the other exists. A topic can have many publishers and
+many subscribers.
+
+In Isaac OS a port belongs to an operator and has a message type. You connect an output port to
+an input port with an explicit edge when you compose the graph. An edge can carry an optional
+alias name. One output can feed several inputs, and an input port accepts one incoming edge.
+
+They are alike in typing: both check that the connected endpoints agree on a message type.
+They differ in how the connection is made. ROS 2 matches endpoints by name and type at runtime,
+which keeps participants decoupled. Isaac OS wires them in code, so a mismatch is found when the
+graph is compiled, and a producer is connected to specific consumers.
+
+Isaac OS also has topics, which are separate from ports and edges. A graph can import a topic to
+receive messages from a named publisher outside the graph, and export a topic to send messages
+to named subscribers outside it. This gives the graph a publish/subscribe interface that
+connects to its ports. The `ros2_bridge` uses imported and exported topics to reach ROS 2, the
+MCAP logger exports one topic per recorded output, and the MCAP replayer imports one topic per
+replayed recording topic.
+
+In ROS 2 the topic is the main way nodes connect. In Isaac OS, ports and edges connect operators
+within a graph, and topics connect the graph to something outside it. Each topic is declared when
+the graph is composed and checked when the graph is compiled.
+
+Message types differ in format. ROS 2 generates types from `.msg` and IDL definitions. Isaac OS
+uses FlatBuffers schemas.
+
+## When the graph exists
+
+A ROS 2 graph has no single description. Nodes start independently, find each other through DDS
+discovery within a ROS domain, and can join or leave at any time.
+
+An Isaac OS graph is described first and run second. Authoring a graph builds a description
+without compiling or executing it. `compile()` then validates the whole graph, including its
+connections, queue options and clocks, and produces an immutable execution plan, along with
+diagnostics if the graph is not valid. `run_async()` runs that plan.
+
+ROS 2 favors participants that join, leave and are replaced while the system is running.
+Isaac OS favors a graph that is checked as a whole before anything runs, at the cost of a fixed
+topology once it is running.
+
+## What makes code run
+
+A ROS 2 node reacts to events. A subscription callback runs when a message arrives, a timer
+callback runs when its period elapses, and an executor decides when each callback gets a thread.
+
+An Isaac OS operator declares a contract with a trigger. `OnEach` runs it once for every sample
+accepted on one input, `OnAnyInput` runs it when any connected input accepts a sample, and
+`OnClock` runs it on a fixed period from a clock. Late periodic ticks are coalesced and the
+schedule keeps its phase. A graph declares a default clock, and compilation fails if a graph
+needs one and has none.
+
+These are three of the available triggers. See the SDK 5.0
+[temporal contracts guide](https://docs.nvidia.com/holoscan/sdk-user-guide/5-0-latest/building-operators/temporal-contracts)
+for other triggers, input selection and missing-data policies.
+
+A subscription callback corresponds to `OnEach`, and a timer to `OnClock`. The difference is
+where the rule lives. In ROS 2 it is code in the node, spread across callbacks. In Isaac OS it
+is a declaration that the compiler can inspect.
+
+## Delivery behavior
+
+ROS 2 quality of service is a set of policies on each endpoint: history (keep last or keep all)
+and depth, reliability, durability, and also deadline, lifespan and liveliness. The default
+profile is keep last 10, reliable and volatile. Publisher and subscriber QoS must be compatible
+for them to connect.
+
+An Isaac OS edge has a queue depth and a queue policy, set by the graph author on that edge.
+The default policy, `kBlocking`, preserves accepted samples and applies backpressure when the
+queue is full. It can return `kBackpressured` instead of waiting; propagating that error from
+`compute()` normally fails the run. The alternative, `kDropOldest`, keeps the newest samples
+up to the queue depth and replaces the oldest. See the SDK's
+[queue policy contract](https://docs.nvidia.com/holoscan/sdk-user-guide/5-0-latest/getting-started/composing-a-graph#tune-an-edge-with-connectionoptions).
+
+Keep-last history and drop-oldest are alike: both keep the most recent samples when the queue
+is full. They differ in scope and defaults. QoS is negotiated between two endpoints and
+covers more properties, such as durability and liveliness. An edge option is a single local
+choice, and its default applies backpressure.
+
+## Threads and concurrency
+
+ROS 2 gives threads to executors. `rclcpp::spin` uses a `SingleThreadedExecutor` by default, which
+runs one callback at a time. A `MultiThreadedExecutor` runs callbacks on a thread pool. Callback
+groups say which callbacks may overlap. Callbacks in a mutually exclusive group do not run at the
+same time as each other, and callbacks in a reentrant group may overlap, even with themselves.
+
+Isaac OS assigns operators to execution partitions when the graph is compiled. Each partition
+that has callbacks gets one owner that runs them serially, and different partitions may run at
+the same time. The compiler builds partitions automatically, for example by separating the
+branches of a fan-out and splitting at process or device boundaries. An author can instead name
+partitions and place operators in them with `graph.partition("name").add(op)`, which the SDK
+describes as developer-preview, and can bind thread placement such as CPU affinity and
+scheduling policy to a named partition. Several Isaac OS applications do this, for example to
+keep a control loop apart from camera or model work. The
+[WBC G1](/isaac-os/reference/applications/wbc-g1) and
+[robot control benchmark](/isaac-os/reference/applications/robot-control-benchmark)
+pages describe their partitions.
+
+The two are alike in letting you separate work into groups that run serially within the group and
+may overlap with other groups. The closest ROS 2 analog is a mutually exclusive callback group
+served by its own executor thread. They are not equivalent:
+
+- The unit differs. A callback group holds callbacks, and a partition holds operators.
+- The default differs. ROS 2 starts with a single thread and you opt into more. Isaac OS plans
+  partitions for you and you override them where needed.
+- A partition cannot run more than one callback at a time, so it has no equivalent of a
+  reentrant group.
+- A callback group constrains callbacks that share a pool of threads, while a partition owns
+  its execution lane.
+
+## Process boundaries
+
+ROS 2 nodes talk through DDS regardless of where they run, so two nodes in different processes or
+on different machines use the same interface as two in one process. Where nodes run is a
+deployment choice, made apart from the node code.
+
+Isaac OS compiles the whole graph into one plan. The plan records which runtime process owns each
+part of the graph and which edges cross between processes. In the applications documented here,
+the graph runs in one process and samples between operators stay inside it. The graph reaches
+other systems through bridge components: UCX send and receive bridges for Isaac Sim, as described
+in [Application modes](/isaac-os/explanation/application-modes), and `ros2_bridge` for ROS 2,
+which attaches through imported and exported topics.
+
+They differ in how a boundary is treated. In ROS 2 the middleware sits between every pair of
+nodes. In Isaac OS the process layout is part of the compiled plan, and in the applications
+documented here a boundary appears only where the application places one.
+
+To connect an Isaac OS graph to ROS 2 nodes, see
+[Exchange Messages with ROS 2](/isaac-os/how-to/connect-a-ros-2-graph).
+
+## Related
+
+- [Isaac OS concepts](/isaac-os/explanation/isaac-os-basics): Isaac OS terms and the Holoscan
+  documentation.
+- [Exchange Messages with ROS 2](/isaac-os/how-to/connect-a-ros-2-graph): wiring a graph to
+  ROS 2 nodes.

@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# --- Simulation connection ---
+# UCX peer that Isaac Sim (isaacsim.ucx.core) exposes for joint state / time
+# receive and joint command send.
+sim_so101:
+  hostname: "127.0.0.1"
+  port: 50008
+  # Buffer sizes used by the receivers' tagRecv posts. Must be big enough to
+  # hold a full JointState / Time FBS blob; keep at defaults unless the schemas
+  # grow.
+  joint_state_flatbuffer_buffer_size: 16384
+  # Display the simulator camera. Set false for headless runs or scenes without a camera.
+  enable_camera: true
+  # Receive capacity must hold the RGB payload (640 * 480 * 3 bytes).
+  camera_tensor_buffer_size: 921600
+  image_flatbuffer_buffer_size: 4096
+
+# --- Sinus motion generator ---
+# Position command:  default_position[i] + sin_amplitude * sin(2 pi f t)
+# Fields default_position, kp, kd may be given as either a scalar (broadcast to
+# all num_joints) or a length-num_joints list.
+sinus_motion_op:
+  num_joints: 6
+  sin_frequency: 0.25 # Hz
+  sin_amplitude: 0.20 # radians
+  default_position: [0.0]
+  kp: [30.0]
+  kd: [1.0]

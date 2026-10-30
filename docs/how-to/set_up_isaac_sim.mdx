@@ -1,0 +1,205 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Set up Isaac Sim
+
+<Note>
+Start Isaac Sim in a container, load a scene and connect an Isaac OS application
+over UCX. Configure the display, caches and control rate for your application.
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Set up Isaac Sim" hidePrompt actions={["cursor"]}>
+Find the application, scene and host setup in our conversation and project. Ask
+me for missing details.
+Follow [Set up Isaac Sim](/isaac-os/how-to/set-up-isaac-sim). Check compatibility,
+and verify that the simulator and application connect.
+</Prompt>
+</llms-ignore>
+
+## Prerequisites
+
+- GPU and driver meeting the [Isaac Sim requirements](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/requirements.html) for the image you run
+- Docker with NVIDIA Container Toolkit
+- Network access to download the Isaac Sim image and scene assets
+## Run a Scene
+
+Run from the repository root so repo-relative asset paths resolve:
+
+```bash
+./isaac_sim run --scene path/to/scene.usd
+```
+The command loads the stage, creates or reuses persistent Isaac Sim caches, and
+waits for a UCX client to connect. When the client disconnects, the stage resets
+and the listener waits for the next connection.
+
+The examples in this guide run interactively and prompt for the Isaac Sim EULA
+on first use. For non-interactive or CI runs, add `-y` (or `--accept-eula`)
+to accept it up front. Set `--privacy-consent` separately if you want to opt in
+to NVIDIA telemetry.
+
+## Connecting an Application
+
+`./isaac_sim` runs the simulator; `./isaac_os` runs the Holoscan application
+that connects to it. Start the simulator (above) and the application in separate
+terminals, in either order; each waits for the other. Run an application in `sim`
+mode:
+
+```bash
+./isaac_os run <app> sim
+```
+The simulator and all supplied Isaac Sim applications default to port `50008`.
+For Unitree applications, start the simulator with `-- --substeps 4`. See the
+[WBC](/isaac-os/reference/applications/wbc-g1#isaac-sim) and
+[GR00T/G1](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#isaac-sim) references
+for complete scene and controller commands. If you override the port, match it at both ends.
+For simultaneous simulations on one host, give each simulator/controller pair a distinct port.
+Applications wait indefinitely for the initial UCX connection, retrying every second.
+To limit the wait and change the retry interval, pass application options after `--`:
+
+```bash
+./isaac_os run <app> sim -- --connect-timeout-ms 60000 --connect-retry-interval-ms 500
+```
+
+`--connect-timeout-ms 0` waits indefinitely; `--connect-retry-interval-ms` must be positive.
+Ctrl+C cancels the wait. The timeout is checked between UCX operations, so a blocking
+transport or name-resolution call can delay cancellation or timeout handling.
+An established connection dropping still fails the application; it does not reconnect.
+
+Stop the application first. Isaac Sim resets the stage and waits for another
+connection on the same port. To replace the simulator, stop its command
+and wait for it to exit before launching another.
+
+<Accordion title="⚠️ The UCX connection hangs on a host with multiple interfaces">
+
+On a host with multiple network interfaces, restrict the UCX connection
+manager to the single (loopback) device the simulator binds; otherwise UCX may
+fan out across every interface and the connection can hang:
+
+```bash
+ISAAC_OS_EXTRA_DOCKER_RUN_ARGS="-e UCX_CM_USE_ALL_DEVICES=n" \
+  ./isaac_os run <app> sim
+```
+
+</Accordion>
+
+## Display and Headless Runs
+
+If `DISPLAY` is unset, `./isaac_sim` passes `--headless` to the Python
+entrypoint. If `DISPLAY` is set, it mounts X11 and prepares a Docker
+Xauthority file with `xauth` when available, falling back to
+`xhost +local:docker`.
+
+## Assets
+
+`--scene` takes a host path, either relative or absolute. The launcher mounts
+the scene file's parent directory into the container, so sibling files
+referenced by the USD stage remain available.
+
+```bash
+./isaac_sim run --scene path/to/scene.usd
+```
+## Cache
+
+Isaac Sim can take several minutes the first time it compiles shaders and
+caches extensions.
+
+Use `warmup` to populate the mounted cache directories without waiting for
+an application connection. It performs one physics step and render, then closes
+Isaac Sim and waits for pending cache writes:
+
+```bash
+./isaac_sim warmup --scene path/to/scene.usd
+```
+The cache root defaults to `$HOME/docker/isaac-sim`. Use `--cache-root` to
+place the cache elsewhere:
+
+```bash
+./isaac_sim run \
+  --cache-root path/to/isaac-sim-cache \
+  --scene path/to/scene.usd
+```
+## Custom Isaac Sim Images
+
+Pass `--image` to use a different Isaac Sim image:
+
+```bash
+./isaac_sim run \
+  --image nvcr.io/nvidia/isaac-sim:6.2.0.1 \
+  --scene path/to/scene.usd
+```
+Use `--from-source` if you need an Isaac Sim image built from a source
+checkout:
+
+```bash
+isaac_sim_local=~/isaac-sim
+git clone https://github.com/isaac-sim/IsaacSim.git $isaac_sim_local
+./isaac_sim build --from-source $isaac_sim_local
+```
+`run --from-source` builds the source image first, then runs the image tagged
+for that checkout commit:
+
+```bash
+./isaac_sim run \
+  --from-source <isaac-sim-checkout> \
+  --scene path/to/scene.usd
+```
+
+## Configure joint gains
+
+With the stock UCX nodes, including the supplied Unitree and SO-101 scenes, Isaac Sim up to
+6.2.1.0 does not apply joint-command PD gains (`kp` and `kd`) received through UCX. Tune stiffness
+and damping on the scene's USD articulation drives; application command gains do not override
+those settings.
+
+## Other launcher options
+
+Use `./isaac_sim --help` for shell, dry-run, environment and port options.
+The [UCX entrypoint reference](../../tools/isaac-sim-ucx/README.md)
+covers the Python arguments passed after `--`. Put Docker options before the
+separator and entrypoint arguments after it:
+
+```bash
+./isaac_sim run --scene path/to/scene.usd --env UCX_LOG_LEVEL=info \
+  -- --substeps 4
+```
+
+## Physics and control rate
+
+1. **Set the physics rate.** Set `physxScene:timeStepsPerSecond` on the USD
+   `PhysicsScene` prim, or pass `--sim-dt <seconds>` to override it at launch.
+   For 200 Hz, use `--sim-dt 0.005`. Without either setting, the launcher uses 200 Hz.
+2. **Configure physics-driven control.** In the scene's `ActionGraph`, add
+   `isaacsim.core.nodes.OnPhysicsStep` and an
+   `isaacsim.core.nodes.IsaacSimulationGate` named `physics_control_gate`, with
+   an `inputs:step` attribute initialized to `1`. Connect:
+   - `OnPhysicsStep.outputs:step` to the gate's `inputs:execIn`.
+   - The gate's `outputs:execOut` to the first node of each control chain, such
+     as joint state and IMU publication. Keep command application downstream
+     of state publication.
+
+   Replace each chain's existing playback trigger with this connection; keep
+   rendering on its separate trigger. The
+   [G1 scene](../../operators/unitree_g1/assets/g1_ucx.usda)
+   already has this wiring.
+3. **Choose the control rate.** Pass `--substeps N`, where `N` is the integer ratio
+   of physics rate to control rate. Use `4` for 200 Hz physics and 50 Hz control,
+   or `1` (the default) for control on every physics step.
+
+`--substeps` configures the named gate; it does not create it or rewire the graph.
+If you keep an `OnPlaybackTick` control chain, do not assume this ratio sets its rate.
+
+For the G1 WBC application, run its prepared scene at 200 Hz physics and 50 Hz control:
+
+```bash
+./isaac_sim run --scene operators/unitree_g1/assets/g1_ucx.usda \
+  -- --sim-dt 0.005 --substeps 4
+```
+See the [UCX entrypoint reference](../../tools/isaac-sim-ucx/README.md#physics-vs-control-rate)
+for stepping and clock details.
+
+See [application modes](/isaac-os/explanation/application-modes) for the two simulation
+patterns and clock differences, and [platforms](/isaac-os/reference/platforms)
+for the distinction between simulator hosts and deployment support.

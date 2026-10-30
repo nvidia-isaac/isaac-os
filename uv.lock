@@ -1,0 +1,22 @@
+version = 1
+revision = 5
+requires-python = ">=3.11"
+
+[[package]]
+name = "holoscan-cli"
+version = "5.0.0"
+source = { registry = "https://pypi.nvidia.com/" }
+wheels = [
+    { url = "https://pypi.nvidia.com/holoscan-cli/holoscan_cli-5.0.0-py3-none-any.whl", hash = "sha256:e5a41344d620ab1c8dddfe499867cc3d37e882e65a06fce87ed4daab90ee6450" },
+]
+
+[[package]]
+name = "isaac-os"
+version = "0.0.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "holoscan-cli" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "holoscan-cli", specifier = "==5.0.0" }]

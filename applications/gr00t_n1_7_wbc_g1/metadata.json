@@ -1,0 +1,56 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "mock",
+    "description": "Unitree G1 GR00T N1.7 and WBC control graph with physical robot, deterministic mock, and Isaac Sim modes.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0.1"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "mock": {
+        "description": "Run the deterministic GR00T N1.7 and WBC graph without robot or camera I/O.",
+        "run": {
+          "command": "<isaac_app_bin>/mock/mock_gr00t_n1_7_wbc_g1 --application-config-path=applications/gr00t_n1_7_wbc_g1/config/control.yaml --model-config-path=operators/gr00t_n1_7/config/n1_7_g1.yaml",
+          "workdir": "isaac_root"
+        }
+      },
+      "real": {
+        "description": "Run on the physical G1 over DDS with a real camera; GR00T N1.7 inference and Agile WBC. Set unitree_g1_robot.network_interface to the robot NIC.",
+        "run": {
+          "command": "<isaac_app_bin>/real/real_gr00t_n1_7_wbc_g1 --domain-id 0 --config-path=applications/gr00t_n1_7_wbc_g1/config/control.yaml --model-config-path=operators/gr00t_n1_7/config/n1_7_g1.yaml",
+          "workdir": "isaac_root"
+        }
+      },
+      "sim": {
+        "description": "Run N1.7 and WBC against Isaac Sim; add --holoviz to display the camera.",
+        "run": {
+          "command": "<isaac_app_bin>/sim/sim_ucx_gr00t_n1_7_wbc_g1 --application-config-path=applications/gr00t_n1_7_wbc_g1/config/control.yaml --model-config-path=operators/gr00t_n1_7/config/n1_7_g1_apple_sim_trt.yaml",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "gr00t_n1_7_wbc_g1",
+    "platforms": [
+      "x86_64",
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "tags": [
+      "robot",
+      "robotics",
+      "testing"
+    ],
+    "version": "0.1.0"
+  }
+}

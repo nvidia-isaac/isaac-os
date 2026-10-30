@@ -1,0 +1,16 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+namespace isaac;
+
+// Specifies a command for an ordered set of joints using CPU arrays.
+table JointCommandCpu {
+  position: [float] (id: 0, required);
+  velocity: [float] (id: 1, required);
+  effort: [float] (id: 2, required);
+  kp: [float] (id: 3, required);
+  kd: [float] (id: 4, required);
+}
+
+root_type JointCommandCpu;
+file_identifier "ISJC";

@@ -1,0 +1,498 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# SO-101 Reach Task - Part 1: Training the Policy
+
+<Note>
+Create a reach environment in Isaac Lab, train an SO-101 policy with
+[Proximal Policy Optimization (PPO)](https://arxiv.org/abs/1707.06347), and export it
+as ONNX.
+
+To use the supplied policy without training your own, skip to
+[Part 2: Simulation](/isaac-os/tutorials/so101-reach/simulation) or
+[Part 3: Deployment](/isaac-os/tutorials/so101-reach/deployment).
+</Note>
+
+# Prerequisites
+
+Before starting, ensure you have:
+
+1. **Isaac Lab installed** — follow the
+   [Isaac Lab installation guide](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html).
+   The shipped policy was trained with Isaac Lab v2.3.1; later versions may need minor API changes.
+
+2. **SO-101 USD asset** — a URDF/USD of the SO-101 arm imported into
+   Isaac Lab.  See
+   [Importing a New Asset](https://isaac-sim.github.io/IsaacLab/main/source/how-to/import_new_asset.html)
+   if you need to convert from URDF.
+
+3. **Familiarity with manager-based RL environments** — review
+   [Creating a Manager-Based RL Environment](https://isaac-sim.github.io/IsaacLab/main/source/tutorials/03_envs/create_manager_rl_env.html)
+   before proceeding.
+
+4. **A custom Isaac Lab project** — create one with
+   `./isaaclab.sh --new` as described in
+   [Build your Own Project or Task](https://isaac-sim.github.io/IsaacLab/main/source/overview/own-project/index.html).
+
+# Task Overview
+
+The reach task is a goal-conditioned RL problem: a policy controls
+4 arm joints to move the end-effector (EE) — the fingertip — to a
+target position in 3-D space.
+
+<Note>
+
+The policy shipped with Isaac OS was trained with **NVIDIA Isaac Lab**, using
+some project-specific subclasses of the stock Isaac Lab classes.  This
+tutorial builds the equivalent from the stock classes, so a few class names
+here differ from those recorded in the shipped IO descriptor; those
+differences are called out where they matter.  The observation and action
+contracts are the same, and those are what Part 3 depends on.
+
+</Note>
+Key characteristics:
+
+- **State-only** — no vision; the policy operates on proprioceptive
+  observations and a goal command.
+- **4-DOF control** — the policy outputs deltas for four
+  degrees of freedom (DOF): `shoulder_pan`, `shoulder_lift`,
+  `elbow_flex`, and `wrist_flex`.  The `wrist_roll` and
+  `gripper` joints are observed but not actuated.
+- **Goal sampling** — random or grid-based 3-D goals within the
+  reachable workspace.
+
+Isaac Lab ships reach environments under
+`isaaclab_tasks.manager_based.manipulation.reach` which you can use as
+a starting point.  The sections below describe how to build a
+SO-101-specific variant.
+
+# Defining the Scene
+
+The scene consists of the SO-101 articulation, a table, and basic
+lighting.  Use `InteractiveSceneCfg` with your SO-101
+`ArticulationCfg`:
+
+```python
+from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.utils import configclass
+import isaaclab.sim as sim_utils
+
+from my_project.assets import SO101_CFG   # your SO-101 asset config
+
+@configclass
+class ReachSceneCfg(InteractiveSceneCfg):
+    ground = AssetBaseCfg(
+        prim_path='/World/ground',
+        spawn=sim_utils.GroundPlaneCfg(size=(2.0, 2.0)),
+    )
+    table = AssetBaseCfg(
+        prim_path='/World/table',
+        spawn=sim_utils.CuboidCfg(size=(0.6, 0.4, 0.02)),
+    )
+    robot: ArticulationCfg = SO101_CFG.replace(
+        prim_path='{ENV_REGEX_NS}/Robot',
+    )
+    dome_light = AssetBaseCfg(
+        prim_path='/World/DomeLight',
+        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
+    )
+```
+See [Creating an empty scene](https://isaac-sim.github.io/IsaacLab/main/source/tutorials/00_sim/create_empty.html)
+for more details on scene configuration.
+
+# Defining Actions
+
+The policy controls 4 arm joints.  The two remaining joints
+(wrist_roll, gripper) appear in the observation but are not actuated.
+
+Actions are *deltas* against the joint position the robot is currently
+at, not targets in an absolute joint frame:
+
+```python
+from isaaclab.envs.mdp.actions import RelativeJointPositionActionCfg
+from isaaclab.utils import configclass
+
+@configclass
+class ActionsCfg:
+    joint_position = RelativeJointPositionActionCfg(
+        asset_name='robot',
+        joint_names=[
+            'shoulder_pan', 'shoulder_lift',
+            'elbow_flex', 'wrist_flex',
+        ],
+        scale=0.2,
+        use_zero_offset=True,
+    )
+```
+The `scale` parameter converts the raw policy output (clipped to
+[-1, 1]) into radians of displacement per control step.  At 0.2 the
+policy can move any joint by at most 0.2 rad per tick, which at the
+50 Hz control rate bounds joint speed at 10 rad/s.  Lower it if the
+real servos cannot track the commanded steps.
+
+<Warning>
+
+The deployment runtime implements the delta law and only the delta
+law: it adds the policy output to the *measured* joint position on
+every tick.  A policy trained with `JointPositionActionCfg` -- which
+adds the action to the *default* pose instead -- would be driven under
+the wrong law and send the arm somewhere else entirely.  The runtime
+reads no training-time metadata, so it cannot detect the mismatch and
+will not refuse the policy; matching the action law is your
+responsibility.  `use_zero_offset=True` matters for the same reason:
+a delta has nowhere to put a per-joint offset.
+
+</Warning>
+
+The policy shipped with Isaac OS trains against
+`DelayedDeltaJointPositionActionCfg`, a subclass that adds
+randomized action delay and a per-tick displacement clamp.  Both are
+domain randomization for real servo behavior; the deployed control law
+is the plain delta above.
+
+# Defining Observations
+
+The policy receives a 20-dimensional observation vector assembled from
+four terms.  The table below summarizes its structure:
+
+| Term | Shape | Description |
+| --- | --- | --- |
+| `joint_pos_rel` | [6] | Joint positions relative to default (all 6 joints) |
+| `ee_position` | [3] | End-effector (fingertip) position in the robot root frame |
+| `generated_commands` | [7] | Goal pose: position (xyz) + orientation (quaternion wxyz) |
+| `last_action` | [4] | Previous action, clipped to [-1, 1] |
+Configure these as observation terms.  Most come from Isaac Lab's
+built-in `mdp` module; the EE position term is a custom function you
+define in your project (shown as `my_mdp` below):
+
+```python
+from isaaclab.managers import ObservationGroupCfg as ObsGroup
+from isaaclab.managers import ObservationTermCfg as ObsTerm
+from isaaclab.managers import SceneEntityCfg
+from isaaclab.utils import configclass
+import isaaclab.envs.mdp as mdp
+
+import my_project.mdp as my_mdp  # your custom observation terms
+
+@configclass
+class ObservationsCfg:
+    @configclass
+    class PolicyCfg(ObsGroup):
+        joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel)
+        ee_position = ObsTerm(
+            func=my_mdp.ee_position_in_robot_root_frame,
+            params={'asset_cfg': SceneEntityCfg('robot')},
+        )
+        generated_commands = ObsTerm(
+            func=mdp.generated_commands,
+            params={'command_name': 'ee_pose'},
+        )
+        last_action = ObsTerm(func=mdp.last_action, params={'clip': (-1.0, 1.0)})
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.concatenate_terms = True
+
+    policy: PolicyCfg = PolicyCfg()
+```
+<Note>
+
+`ee_position_in_robot_root_frame` is a custom observation term you
+implement in your project using a `FrameTransformerCfg` to track
+the fingertip position with an appropriate offset from the gripper
+link.
+
+</Note>
+
+<Accordion title="❓ Why is there no joint velocity term?">
+
+The Feetech speed is differentiated from a coarse encoder and is too noisy for the policy
+to learn from. The runtime operator builds a fixed 20-D observation, so a 26-D policy
+needs a runtime operator change before it can run. See
+[Part 3: Deployment](/isaac-os/tutorials/so101-reach/deployment) for the layout the
+runtime builds and the tensor shapes it checks at startup.
+
+</Accordion>
+
+# Defining Rewards
+
+The reward structure encourages the end-effector to reach the goal
+while keeping motions smooth and within joint limits:
+
+```python
+from isaaclab.managers import RewardTermCfg as RewTerm
+from isaaclab.managers import SceneEntityCfg
+from isaaclab.utils import configclass
+import isaaclab.envs.mdp as mdp
+
+import my_project.mdp as my_mdp  # your custom reward terms
+
+@configclass
+class RewardsCfg:
+    reaching = RewTerm(
+        func=my_mdp.ee_goal_distance_l2,
+        weight=-1.0,
+    )
+    action_penalty = RewTerm(
+        func=mdp.action_l2,
+        weight=-0.01,
+    )
+    joint_limit_penalty = RewTerm(
+        func=mdp.joint_pos_limits,
+        weight=-0.1,
+        params={'asset_cfg': SceneEntityCfg('robot')},
+    )
+    alive = RewTerm(func=mdp.is_alive, weight=0.5)
+```
+Tune the weights based on convergence behavior.  A well-trained reach
+policy typically converges in 3000–5000 iterations with 4096
+environments.
+
+<Accordion title="❓ What reward does the shipped policy use?">
+
+The policy shipped with Isaac OS uses a multi-scale kernel reward that
+gives stronger signal as the end-effector approaches the goal:
+
+| Term | Function | Weight | Notes |
+| --- | --- | --- | --- |
+| `ee_goal_tracking` | `ee_goal_distance_reward` | 10.0 | Coarse kernel (std=0.3) |
+| `ee_goal_tracking_medium` | `ee_goal_distance_reward` | 5.0 | Medium kernel (std=0.1) |
+| `ee_goal_tracking_fine` | `ee_goal_distance_reward` | 10.0 | Fine kernel (std=0.05) |
+| `action_rate` | `action_rate_l2` | -1e-3 | Smoothness penalty |
+| `joint_vel` | `joint_vel_l2` | -1e-3 | Joint velocity penalty |
+
+</Accordion>
+
+# Defining Terminations
+
+Episodes need a termination condition so the environment resets and the
+agent can practice from varied starting states.  For the reach task a
+simple time-out is sufficient:
+
+```python
+from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.utils import configclass
+import isaaclab.envs.mdp as mdp
+
+@configclass
+class TerminationsCfg:
+    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+```
+The episode terminates after a fixed duration (e.g. 12 seconds).  You
+may also add a `goal_reached` termination if you want to reset early
+on success.
+
+See [Defining termination criteria](https://isaac-sim.github.io/IsaacLab/main/source/tutorials/03_envs/create_manager_rl_env.html#defining-termination-criteria)
+for more details.
+
+# Defining Commands
+
+Goals are sampled uniformly within the SO-101 reachable workspace using
+`UniformPoseCommandCfg`:
+
+```python
+from isaaclab.envs.mdp.commands import UniformPoseCommandCfg
+from isaaclab.utils import configclass
+
+@configclass
+class CommandsCfg:
+    ee_pose = UniformPoseCommandCfg(
+        asset_name='robot',
+        body_name='gripper_link',
+        resampling_time_range=(4.0, 4.0),
+        ranges=UniformPoseCommandCfg.Ranges(
+            pos_x=(0.10, 0.25),
+            pos_y=(-0.15, 0.15),
+            pos_z=(0.10, 0.30),
+        ),
+    )
+```
+Adjust the position ranges to match your robot's workspace.  Deployment
+ranges (the `policy.goal_pos_*_range` keys in Part 3) must stay within
+these training bounds but may be a tighter subset for added safety on
+real hardware.
+
+# Training Configuration
+
+Tie all the components together into a `ManagerBasedRLEnvCfg`.  This
+single config class is what Isaac Lab uses to instantiate the
+environment:
+
+```python
+from isaaclab.envs import ManagerBasedRLEnvCfg
+from isaaclab.utils import configclass
+
+@configclass
+class ReachEnvCfg(ManagerBasedRLEnvCfg):
+    scene: ReachSceneCfg = ReachSceneCfg(num_envs=4096, env_spacing=1.5)
+    observations: ObservationsCfg = ObservationsCfg()
+    actions: ActionsCfg = ActionsCfg()
+    rewards: RewardsCfg = RewardsCfg()
+    terminations: TerminationsCfg = TerminationsCfg()
+    commands: CommandsCfg = CommandsCfg()
+
+    def __post_init__(self):
+        self.decimation = 2
+        self.episode_length_s = 12.0
+        self.sim.dt = 0.01         # 100 Hz physics
+        # With decimation=2: 50 Hz control frequency
+```
+Next, configure the PPO training hyperparameters via the
+[RSL-RL](https://github.com/leggedrobotics/rsl_rl) runner config.
+The table below lists recommended starting values:
+
+| Parameter | Value | Notes |
+| --- | --- | --- |
+| `max_iterations` | 5000 | Typically converges by 3000–4000 |
+| `num_steps_per_env` | 24 | Rollout length per iteration |
+| `policy / value network` | [256, 128, 64] | 3-layer MLP (Multi-Layer Perceptron) with ELU activation |
+| `learning_rate` | 1e-3 | With adaptive schedule |
+| `gamma` | 0.99 | Discount factor |
+| `empirical_normalization` | True | Running observation normalization |
+Launch training:
+
+```bash
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py \
+    --task <YourReachTask> \
+    --num_envs 4096 \
+    --headless
+```
+Training logs are written to `logs/rsl_rl/<experiment_name>/<timestamp>/`.
+Monitor reward curves via TensorBoard:
+
+```bash
+tensorboard --logdir logs/rsl_rl/<experiment_name>/
+```
+# Evaluating and Exporting
+
+Once training completes, evaluate the policy in simulation and export
+it to ONNX for deployment:
+
+```bash
+./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py \
+    --task <YourReachTask_PLAY> \
+    --num_envs 50 \
+    --checkpoint logs/rsl_rl/<experiment_name>/<timestamp>/model_5000.pt
+```
+The play script exports:
+
+- `exported/policy.onnx` — the ONNX model used by Isaac OS for
+  real-time inference via NVIDIA TensorRT.
+- `exported/policy.pt` — the JIT-traced PyTorch model (useful for
+  debugging but not used for deployment).
+
+Both files are written next to the checkpoint in the
+`exported/` subdirectory.
+
+<Tip>
+
+Before deploying on real hardware, it is advisable to perform
+sim-to-sim validation by running the exported ONNX policy in an
+independent simulator such as MuJoCo.  This catches discrepancies
+between the training and deployment observation pipelines (e.g.
+joint ordering, scale mismatches) in a safe, reproducible
+environment.  Sim-to-sim validation is beyond the scope of this
+tutorial.
+
+</Tip>
+
+# Exporting IO Descriptors
+
+IO descriptors are YAML files that capture the exact observation and
+action layout of a trained policy — joint names, shapes, scales,
+offsets, and data types.  They record the **contract** between training
+and deployment.  The deployment runtime does not read them; it is the
+reference you transcribe into Part 3's configuration so that the runtime
+assembles tensors in the same order and scale the policy was trained
+with.
+
+See [IO Descriptors 101](https://isaac-sim.github.io/IsaacLab/main/source/policy_deployment/01_io_descriptors/io_descriptors_101.html)
+for a detailed explanation.
+
+Export IO descriptors for your environment:
+
+```bash
+./isaaclab.sh -p scripts/tools/export_io_descriptors.py \
+    --task <YourReachTask>
+```
+This produces a YAML file that looks like:
+
+```yaml
+observations:
+  policy:
+    - name: joint_pos_rel
+      full_path: isaaclab.envs.mdp.observations.joint_pos_rel
+      shape: [6]
+      dtype: torch.float32
+      joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper]
+      joint_pos_offsets: [0.0, 0.0, 0.0, 1.57, 0.0, 0.0]
+    - name: ee_position
+      shape: [3]
+    - name: generated_commands
+      shape: [7]
+    - name: last_action
+      shape: [4]
+actions:
+  - name: joint_position_action
+    full_path: isaaclab.envs.mdp.actions.joint_actions.RelativeJointPositionAction
+    shape: [4]
+    joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex]
+    scale: 0.2
+    offset: 0.0
+articulations:
+  robot:
+    joint_names: [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper]
+    default_joint_pos_limits: [[-1.92, 1.92], [-1.75, 1.75], ...]
+scene:
+  physics_dt: 0.01
+  dt: 0.02
+  decimation: 2
+```
+Check these fields before moving on:
+
+- `actions[0].full_path` names a delta class (`Relative...` or `...Delta...`).
+- `actions[0].offset` is zero.
+- The articulation's `joint_names` start with the action's joint names in the same order.
+
+**Success criterion:** `exported/policy.onnx` exists and the descriptor passes all three
+checks.
+
+Four descriptor values become configuration keys in Part 3:
+`actions[0].scale` sets `motion_control.action_scale`,
+`default_joint_pos_limits` narrowed to the controlled joints sets
+`motion_control.joint_pos_limits_lower` and
+`motion_control.joint_pos_limits_upper`,
+`joint_pos_offsets` sets `policy.default_joint_position`, and
+`scene.dt` sets `policy.inference_period`.
+
+<Warning>
+
+Keep both the `policy.onnx` and the IO descriptors YAML file.  Part 3
+loads the ONNX and uses the descriptor as the reference for those
+configuration values.
+
+</Warning>
+
+# Summary
+
+In this part you learned how to:
+
+1. **Define a reach RL environment** with scene, actions, observations,
+   rewards, terminations, and commands using Isaac Lab's manager-based
+   framework.
+2. **Train a policy** with PPO using 4096 parallel environments.
+3. **Export the trained policy** to ONNX format for real-time inference.
+4. **Generate IO descriptors** that capture the training contract for
+   deployment.
+
+## Next Steps
+
+- [Part 2: Simulation](/isaac-os/tutorials/so101-reach/simulation) —
+  run the policy against a simulated arm in Isaac Sim before hardware deployment.
+- [Part 3: Deployment](/isaac-os/tutorials/so101-reach/deployment) —
+  configure, build, and run the trained policy on real SO-101 hardware.
+- [Sim2Real Deployment of Policies Trained in Isaac Lab](https://isaac-sim.github.io/IsaacLab/main/source/policy_deployment/index.html) —
+  Isaac Lab's deployment reference.

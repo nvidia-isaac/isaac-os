@@ -1,0 +1,293 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+[project]
+name = "isaac-os"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    # Wheel pin (holoscan-cli==X.Y.Z) or git pin (holoscan-cli @ git+...@<sha>); see [tool.uv].
+    "holoscan-cli==5.0.0",
+]
+
+[tool.uv]
+package = false
+# Never run sdist build scripts. For a git holoscan-cli pin, uncomment the next
+# line so that only holoscan-cli is built from source (pypi.nvidia.com has no sdist).
+no-build = true
+# no-binary-package = ["holoscan-cli"]
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+
+# =============================================================================
+# Ruff (linter + formatter)
+# =============================================================================
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["I"]
+fixable = ["I"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+force-single-line = true
+
+# =============================================================================
+# mypy (type checking)
+# =============================================================================
+[tool.mypy]
+# Per-module overrides can be added as [[tool.mypy.overrides]] entries.
+
+# =============================================================================
+# pylint
+# =============================================================================
+[tool.pylint.master]
+ignore = "third_party"
+persistent = false
+load-plugins = [
+    "pylint.extensions.docparams",
+    "pylint.extensions.typing",
+]
+jobs = 4
+
+[tool.pylint."messages control"]
+disable = [
+    "apply-builtin",
+    "arguments-differ",
+    "attribute-defined-outside-init",
+    "backtick",
+    "bad-continuation",
+    "bad-option-value",
+    "basestring-builtin",
+    "buffer-builtin",
+    "c-extension-no-member",
+    "cmp-builtin",
+    "cmp-method",
+    "coerce-builtin",
+    "coerce-method",
+    "consider-using-enumerate",
+    "delslice-method",
+    "div-method",
+    "duplicate-code",
+    "eq-without-hash",
+    "execfile-builtin",
+    "file-builtin",
+    "filter-builtin-not-iterating",
+    "fixme",
+    "getslice-method",
+    "global-statement",
+    "hex-method",
+    "idiv-method",
+    "implicit-str-concat",
+    "import-error",
+    "import-self",
+    "import-star-module-level",
+    "inconsistent-return-statements",
+    "input-builtin",
+    "intern-builtin",
+    "invalid-str-codec",
+    "locally-disabled",
+    "logging-fstring-interpolation",
+    "logging-not-lazy",
+    "long-builtin",
+    "long-suffix",
+    "map-builtin-not-iterating",
+    "metaclass-assignment",
+    "misplaced-comparison-constant",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "missing-param-doc",
+    "missing-raises-doc",
+    "missing-return-doc",
+    "missing-return-type-doc",
+    "next-method-called",
+    "next-method-defined",
+    "no-absolute-import",
+    "no-else-break",
+    "no-else-continue",
+    "no-else-raise",
+    "no-else-return",
+    "no-init",
+    "no-member",
+    "no-name-in-module",
+    "nonzero-method",
+    "oct-method",
+    "parameter-unpacking",
+    "print-statement",
+    "raising-string",
+    "range-builtin-not-iterating",
+    "raw_input-builtin",
+    "rdiv-method",
+    "reduce-builtin",
+    "relative-import",
+    "reload-builtin",
+    "round-builtin",
+    "setslice-method",
+    "signature-differs",
+    "standarderror-builtin",
+    "suppressed-message",
+    "sys-max-int",
+    "too-few-public-methods",
+    "too-many-ancestors",
+    "too-many-arguments",
+    "too-many-boolean-expressions",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "too-many-nested-blocks",
+    "too-many-public-methods",
+    "too-many-return-statements",
+    "too-many-statements",
+    "trailing-newlines",
+    "unichr-builtin",
+    "unicode-builtin",
+    "unnecessary-lambda",
+    "unnecessary-pass",
+    "unpacking-in-except",
+    "use-dict-literal",
+    "use-maxsplit-arg",
+    "useless-else-on-loop",
+    "useless-object-inheritance",
+    "useless-suppression",
+    "using-cmp-argument",
+    "xrange-builtin",
+    "zip-builtin-not-iterating",
+]
+
+[tool.pylint.reports]
+output-format = "text"
+reports = false
+
+[tool.pylint.basic]
+good-names = ["main", "_"]
+docstring-min-length = 10
+# Regular expressions matching correct naming styles.
+function-rgx = '^(?:(?P<exempt>setUp|tearDown|setUpModule|tearDownModule)|(?P<camel_case>_?[A-Z][a-zA-Z0-9]*)|(?P<snake_case>_?[a-z][a-z0-9_]*))$'
+variable-rgx = '^[a-z][a-z0-9_]*(?:_[TR]_[a-z0-9_]+)*$'
+const-rgx = '^(_?[A-Z][A-Z0-9_]*|__[a-z0-9_]+__|_?[a-z][a-z0-9_]*)$'
+attr-rgx = '^_{0,2}[a-z][a-z0-9_]*(?:_[TR]_[a-z0-9_]+)*$'
+argument-rgx = '^(?:[a-z_][a-z0-9_]*|[a-z_][a-z0-9_]*_[TR]_[a-z0-9_]*)$'
+class-attribute-rgx = '^(_?[A-Z][A-Z0-9_]*|__[a-z0-9_]+__|_?[a-z][a-z0-9_]*(?:_[TR]_[a-z0-9_]+)*)$'
+inlinevar-rgx = '^[a-z][a-z0-9_]*$'
+class-rgx = '^_?[A-Z][a-zA-Z0-9]*$'
+module-rgx = '^(_?[a-z][a-z0-9_]*|__init__|__about__)$'
+method-rgx = '(?x)^(?:(?P<exempt>_[a-z0-9_]+__|runTest|setUp|tearDown|setUpTestCase|tearDownTestCase|setupSelf|tearDownClass|setUpClass|(test|assert)_*[A-Z0-9][a-zA-Z0-9_]*|next)|(?P<camel_case>_{0,2}[A-Z][a-zA-Z0-9_]*)|(?P<snake_case>_{0,2}[a-z][a-z0-9_]*))$'
+no-docstring-rgx = '(__.*__|main|test.*|.*test|.*Test)$'
+
+[tool.pylint.typecheck]
+contextmanager-decorators = [
+    "contextlib.contextmanager",
+    "contextlib2.contextmanager",
+]
+ignore-mixin-members = true
+ignored-classes = ["optparse.Values", "thread._local", "_thread._local"]
+
+[tool.pylint.format]
+max-line-length = 100
+ignore-long-lines = '''(?x)(
+  ^\s*(\#\ )?<?https?://\S+>?$
+  | ^\s*(from\s+\S+\s+)?import\s+.+$
+  | ^\s*\#\ SPDX-FileCopyrightText:.*$
+)'''
+single-line-if-stmt = true
+max-module-lines = 99999
+indent-string = "    "
+indent-after-paren = 4
+
+[tool.pylint.miscellaneous]
+notes = ["TODO"]
+
+[tool.pylint.string]
+check-quote-consistency = true
+
+[tool.pylint.variables]
+dummy-variables-rgx = '^\*{0,2}(_$|unused_|dummy_)'
+callbacks = ["cb_", "_cb"]
+redefining-builtins-modules = [
+    "six",
+    "six.moves",
+    "past.builtins",
+    "future.builtins",
+    "functools",
+]
+
+[tool.pylint.logging]
+logging-modules = ["logging", "absl.logging", "tensorflow.io.logging"]
+
+[tool.pylint.similarities]
+min-similarity-lines = 4
+ignore-comments = true
+ignore-docstrings = true
+
+[tool.pylint.imports]
+deprecated-modules = ["regsub", "TERMIOS", "Bastion", "rexec", "sets"]
+known-third-party = ["enchant", "absl"]
+
+[tool.pylint.classes]
+defining-attr-methods = ["__init__", "__new__", "setUp"]
+exclude-protected = ["_asdict", "_fields", "_replace", "_source", "_make"]
+valid-classmethod-first-arg = ["cls", "class_"]
+valid-metaclass-classmethod-first-arg = ["mcs"]
+
+[tool.pylint.exceptions]
+overgeneral-exceptions = [
+    "builtins.StandardError",
+    "builtins.Exception",
+    "builtins.BaseException",
+]
+
+# =============================================================================
+# pyright (type checking)
+# =============================================================================
+[tool.pyright]
+pythonPlatform = "Linux"
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+verboseOutput = false
+
+# =============================================================================
+# codespell (spell checking)
+# =============================================================================
+[tool.codespell]
+builtin = "clear,rare,code,usage"
+check-hidden = true
+skip = [
+    "*.lock",
+    "*.pyi",
+    "*lock.json",
+    "*lock.txt",
+    "*patch",
+    ".codespellrc",
+    ".git*",
+    ".mypy_cache",
+    "*.groovy",
+]
+ignore-regex = "sha256-.*"
+ignore-words-list = [
+    "DOF",
+    "MASTER",
+    "ResetT",
+    "arange",
+    "assertIn",
+    "collet",
+    "deque",
+    "hist",
+    "linearY",
+    "master",
+    "ro",
+    "segway",
+    "stdio",
+    "thirdparty",
+    "uint",
+    "warmup",
+    "ws",
+]

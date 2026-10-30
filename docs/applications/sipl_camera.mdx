@@ -1,0 +1,62 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+{/* Generated from an application README by docs/scripts/sync_application_pages.py. */}
+
+# SIPL Camera
+
+This reference application captures one VB1940 camera through Holoscan Camera's
+`SIPLCaptureOp` and displays its ISP NV12 output directly with Holoviz.
+The HSB board is used through the UDDF driver loaded by SIPL; the application does not depend on
+the Holoscan Sensor Bridge source repository.
+
+Holoviz accepts the captured `ImageT`, including its plane offsets and row strides.
+The display uses full-range BT.709, matching SIPL's ISP output, without intermediate conversion
+operators.
+
+```text
+VB1940 + HSB -> SIPLCaptureOp -> HolovizOp
+                            \-> sensor metadata -> discard
+```
+
+Before running the application, [set up the HSB camera for SIPL](/isaac-os/how-to/set-up-an-hsb-camera-for-sipl)
+and update the selected platform description with the connected board's addresses.
+Host PTP must remain running in every capture mode; see the guide's
+[PTP setup](/isaac-os/how-to/set-up-an-hsb-camera-for-sipl#ptp-clock-synchronization).
+
+## Build and run
+
+```bash
+./isaac_os build sipl_camera
+./isaac_os run sipl_camera
+
+# Optional synchronized stereo preview
+./isaac_os run sipl_camera stereo
+
+# Optional unsynchronized stereo preview
+./isaac_os run sipl_camera stereo_nosync
+```
+
+This reference path accepts the included 2560x1984 NV12 camera mode. Other dimensions require
+matching the application tensor and Holoviz bounds.
+
+Shared VB1940 SIPL platform configurations are in
+`common/sipl/config` (`common/sipl/config`).
+
+Single-camera capture is the default. The `stereo` mode requests hardware synchronization, while
+`stereo_nosync` lets both sensors run independently. Both modes use two capture operators sharing
+one SIPL service, with each camera feeding its own display layer.
+The cameras appear side by side. The preview displays each stream independently; it does not
+pair frames or verify stereo synchronization. Direct executable use accepts `--stereo` with
+the selected stereo JSON; `--camera-index` selects a camera only in single-camera mode.
+
+Synchronized stereo capture has a known platform startup issue: both streams can stop delivering
+frames within the first few seconds. Use `stereo_nosync` when synchronization is not required.
+
+Run from Thor's graphical session so Holoviz can create its Vulkan window. Close the window or
+press Ctrl+C to stop the camera cleanly.
+
+Capture and display share one partition.
+Queue depth one with drop-oldest delivery keeps the preview current.

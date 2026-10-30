@@ -1,0 +1,39 @@
+{
+  "dependencies": {
+    "flatbuffers": "^25.9.23"
+  },
+  "description": "Converts Isaac OS messages to Foxglove schemas for visualization",
+  "devDependencies": {
+    "@foxglove/eslint-plugin": "2.1.0",
+    "@foxglove/extension": "2.34.0",
+    "@types/jest": "^30.0.0",
+    "@types/react": "18.3.24",
+    "@types/react-dom": "18.3.7",
+    "create-foxglove-extension": "1.0.6",
+    "eslint": "9.34.0",
+    "jest": "^30.5.1",
+    "prettier": "3.6.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "ts-jest": "^29.4.12",
+    "typescript": "5.9.2"
+  },
+  "displayName": "Isaac to Foxglove Converter",
+  "homepage": "",
+  "keywords": [],
+  "license": "Apache-2.0",
+  "main": "./dist/extension.js",
+  "name": "isaac-to-foxglove-converter",
+  "publisher": "NVIDIA",
+  "scripts": {
+    "build": "foxglove-extension build",
+    "foxglove:prepublish": "foxglove-extension build --mode production",
+    "lint": "eslint .",
+    "lint:ci": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "local-install": "foxglove-extension install",
+    "package": "foxglove-extension package",
+    "test": "jest"
+  },
+  "version": "0.0.3"
+}

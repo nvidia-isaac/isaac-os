@@ -1,0 +1,30 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+// Fixed wire structs used by Isaac Sim.
+namespace isaac;
+
+// Vector3f using Eigen::Vector3f as native_type
+struct Vector3f {
+  x: float;
+  y: float;
+  z: float;
+}
+
+// Quaternion in (x, y, z, w) order on the wire; identity is (0, 0, 0, 1).
+// Wire ordering matches Newton, Lab, and Warp.
+// Eigen::Quaternionf's internal storage is (x, y, z, w) — the Pack/UnPack
+// adapter copies by named field, so the wire layout is independent of Eigen's.
+struct Quaternionf {
+  x: float;
+  y: float;
+  z: float;
+  w: float;
+}
+
+// Row-major covariance matrix (6x6).
+// The order of the covariance matrix is:
+// [x, y, z, rotation_x, rotation_y, rotation_z]
+struct CovarianceMatrix36f {
+  data: [float:36];
+}

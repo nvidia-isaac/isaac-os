@@ -1,0 +1,57 @@
+#usda 1.0
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+(
+    subLayers = [@./so101_ucx_with_env.usda@]
+    defaultPrim = "so101_new_calib"
+    metersPerUnit = 1
+    upAxis = "Z"
+    # Kit reads the timeline range from the root layer only, not from the sublayer.
+    # Without it, playback loops over a single frame and repeats joint states
+    # without stepping physics.
+    startTimeCode = 0
+    endTimeCode = 1000000
+)
+
+over "so101_new_calib"
+{
+    # The SysID elbow damping is about 10x below the other joints. Under the reach
+    # controller's 0.05 rad command bound, the policy then drives a 2 Hz elbow oscillation.
+    over "joints"
+    {
+        over "elbow_flex"
+        {
+            float drive:angular:physics:damping = 0.058
+        }
+    }
+
+    over "ActionGraph"
+    {
+        # Reach can skip commands on missing policy input or expiry. Keep the last drive
+        # target while letting physics advance instead of waiting indefinitely for a command.
+        over "ucx_subscribe_joint_command"
+        {
+            uint inputs:timeoutMs = 10
+            uint inputs:execIn.connect = </so101_new_calib/ActionGraph/ucx_publish_joint_state.outputs:execOut>
+        }
+        over "ucx_publish_clock"
+        {
+            uint inputs:execIn.connect = []
+        }
+        over "isaac_create_render_product"
+        {
+            bool inputs:enabled = 0
+        }
+        over "ucx_camera_helper"
+        {
+            uint inputs:execIn.connect = []
+        }
+    }
+}
+
+over "PhysicsScene"
+{
+    uint physxScene:timeStepsPerSecond = 100
+}

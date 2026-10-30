@@ -1,0 +1,284 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# GR00T N and whole-body control - Real robot
+
+<Note>
+A physical G1 controlled from Jetson AGX Thor can damage itself or its surroundings,
+so this tutorial proceeds in stages: prepare the models and devices, check model
+execution without commands, then launch real mode, which moves the G1 through startup
+poses, and enable balance and manipulation for an apple-to-plate attempt.
+
+As of Isaac OS v0.11, only the bundled physical-G1 model is supported. Other GR00T
+exports, including your own LEAPP exports, are not supported yet.
+</Note>
+
+## Before you start
+
+### Check your host
+
+Complete [Check your host](/isaac-os/tutorials/getting-started#check-your-host)
+in Getting started on the deployment computer. For this physical-robot path,
+use Jetson AGX Thor with JetPack 7.2.1. Run the host commands below on Thor,
+outside any Isaac ROS container.
+
+### Prepare your source checkout
+
+Follow [Fetch the reference source code](/isaac-os/tutorials/getting-started#fetch-the-reference-source-code)
+on Thor if you do not already have an Isaac OS checkout. Complete the
+[sample app run](/isaac-os/tutorials/getting-started#run-a-sample-app) to check the
+shared build-and-run setup; it should exit after 100 commands without moving a robot.
+Run the following steps from the Isaac OS repository root.
+
+### Use the bundled ONNX models
+
+The build downloads the bundled physical-G1 models: five ONNX models and their
+external weight files, with a 16-step decoded action horizon. Do not export a new
+policy for this tutorial. A simulation policy is not a substitute. Isaac OS loads
+ONNX using its own model YAML; it does not ingest LEAPP metadata. The
+[model handoff contract](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#model-export-contract)
+lists the interfaces and mappings.
+
+### Prepare your robot setup
+
+Use a Unitree G1 with Dex3-1 hands and a head-mounted color camera. Connect the
+camera to Thor by USB and Thor directly to the robot by Ethernet. The camera
+must provide tightly packed YUYV frames at 640 × 480 and 30 FPS. Connect a
+keyboard to Thor for the enable controls; the device checks below verify it.
+Configure the robot-facing Ethernet interface using the G1 operating procedure.
+
+Use the manufacturer's operating procedures and your organization's approved
+robot-safety procedure, with an operator and a safety monitor. Establish the
+external stop/abort procedure for this DDS controller before launch. Isaac ROS
+blend-ratio controls do not govern this application.
+
+<Warning>
+Real mode moves the robot through startup waypoints **before** the enable gate.
+Keep the workspace clear before launch and review
+`operators/start_up/config/g1_start_up.yaml` with the robot operator.
+The enable keys and Ctrl+C are not an emergency stop.
+</Warning>
+
+## 1. Build and copy the bundled models
+
+```bash
+./isaac_os build gr00t_n1_7_wbc_g1
+mkdir -p deployment/gr00t-real/policy
+./isaac_os run-container -- cp -aL \
+  data/gr00t_n1_7/g1_apple_to_plate/. deployment/gr00t-real/policy/
+cp operators/gr00t_n1_7/config/n1_7_g1.yaml deployment/gr00t-real/model.yaml
+cp applications/gr00t_n1_7_wbc_g1/config/control.yaml deployment/gr00t-real/control.yaml
+```
+
+Use the same cache mounts as the build. Copying inside the container resolves
+the cached model symlinks.
+
+The first build downloads dependencies and cached models; first use builds
+TensorRT engines on the target.
+Keep the external-data files beside their ONNX models and preserve filenames.
+
+In `deployment/gr00t-real/model.yaml`, replace the directory prefix
+`data/gr00t_n1_7/g1_apple_to_plate/` in all five `gr00t_n1_7.models[].path`
+entries with `deployment/gr00t-real/policy/`. These entries select
+`preprocess_video.onnx`, `preprocess_state.onnx`, `backbone.onnx`,
+`action_head.onnx` and `decode_action.onnx`. Leave bindings unchanged. Paths resolve from the repository root inside the container.
+`--model-config-path` below selects `deployment/gr00t-real/model.yaml`.
+
+## 2. Configure the devices
+
+Find the robot-facing interface and the connected keyboard:
+
+```bash
+ip -brief link
+cat /proc/bus/input/devices
+```
+
+Edit `deployment/gr00t-real/control.yaml`:
+
+| Field | Set for this exercise |
+| --- | --- |
+| `unitree_g1_robot.network_interface` | Robot-facing Ethernet interface |
+| `camera.device` | Color V4L2 node; the shipped value is `/dev/video4` |
+| `gamepad.keyboard_device` | Keyboard evdev path or a unique device-name substring |
+| `gr00t_wbc.velocity_command_lin_x`, `velocity_command_lin_y`, `velocity_command_ang_z` | Keep all three at `0.0` |
+
+### Check the camera and keyboard
+
+Stop any controller or camera viewer before these checks. On the Thor host,
+install the diagnostic tools and list the camera nodes:
+
+```bash
+sudo apt-get update
+sudo apt-get install v4l-utils ffmpeg evtest
+v4l2-ctl --list-devices
+v4l2-ctl --device=/dev/video4 --list-formats-ext
+```
+
+Replace `/dev/video4` throughout these checks with the color node you selected
+in the YAML. Its format list must include `YUYV` at 640 × 480 and 30 FPS.
+Request that mode and inspect what the device actually accepts:
+
+```bash
+v4l2-ctl --device=/dev/video4 \
+  --set-fmt-video=width=640,height=480,pixelformat=YUYV \
+  --set-parm=30
+v4l2-ctl --device=/dev/video4 \
+  --get-fmt-video \
+  --get-parm
+```
+
+Proceed only when the reported width/height is `640/480`, pixel format is
+`YUYV`, bytes per line is `1280` (tightly packed rows), and frame rate is `30`.
+A depth or metadata node is not a replacement for the color node.
+
+From a terminal on Thor's desktop, open the live color view:
+
+```bash
+ffplay -f v4l2 \
+  -input_format yuyv422 \
+  -video_size 640x480 \
+  -framerate 30 \
+  /dev/video4
+```
+
+Confirm a moving, correctly colored image of the task surface, with the apple
+and plate visible when arranged for the task. Press **Q** to close the viewer
+and release the camera. Real mode does not expose `--holoviz`.
+
+Find the keyboard event node in `/proc/bus/input/devices`, then replace
+`/dev/input/eventX` below with that node:
+
+```bash
+sudo evtest /dev/input/eventX
+```
+
+Press **P** and **O** on the keyboard connected to Thor. Expect `KEY_P` and
+`KEY_O` events with press/release values `1` and `0`. Stop `evtest` with
+**Ctrl+C**. Typing in an SSH terminal does not produce these evdev events.
+
+Finally, check that the application container can open both selected devices,
+using the same node paths as above:
+
+```bash
+./isaac_os run-container -- python3 -c '
+import os
+for path, mode in [("/dev/video4", os.O_RDWR), ("/dev/input/eventX", os.O_RDONLY)]:
+    fd = os.open(path, mode | os.O_NONBLOCK)
+    os.close(fd)
+    print("Opened " + path)
+'
+```
+
+Expect one `Opened` line for each device and no exception. This verifies device
+access inside the container; the earlier checks verify the camera image and key
+events. Resolve a missing node or permission error before launching real mode.
+[Input device setup](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#device-setup)
+covers keyboard selection and gamepad mappings.
+
+## 3. Check model execution without robot commands
+
+```bash
+./isaac_os run gr00t_n1_7_wbc_g1 mock -- \
+  --application-config-path=deployment/gr00t-real/control.yaml \
+  --model-config-path=deployment/gr00t-real/model.yaml \
+  --message-count=500
+```
+
+Wait for model initialization and a successful finite run. Resolve missing files,
+binding/shape errors and unmapped joints before hardware use. This checks the
+models' execution with synthetic inputs; it does not check the camera, balance,
+joint semantics or physical task success.
+
+<Accordion title="⚠️ Model initialization fails">
+
+Check all five ONNX paths, their external-data files and the model bindings.
+Compare state and action joint orders separately, especially the hands. Do not
+fix a mismatch merely by changing the prediction horizon.
+
+If the GPU reports an unsupported Green Context allocation, see
+[GPU configuration](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#gpu-and-cpu-placement).
+The `--green-context-wbc-sms=0` option disables partitioning but can change performance.
+
+</Accordion>
+
+## 4. Prepare the robot and task
+
+Verify that the G1 can balance with the
+[standalone WBC controller](/isaac-os/reference/applications/wbc-g1#real-robot)
+under your robot operating procedure before adding manipulation. Stop that
+controller and any Isaac ROS or other deployment stack before continuing.
+Only one controller may command the robot.
+
+Arrange the task to match the physical policy's training setup. For the reference
+apple-to-plate task, use a roughly 75 cm high table with a black tablecloth, a
+red apple on the robot's left, and a white plate on its right. Keep both objects
+in the head camera's field of view and within the left arm's reach, with stable
+lighting and the trained robot/table alignment.
+
+Have the safety monitor ready at the approved stop mechanism. Keep people out
+of the reach envelope and cables clear of the startup motion. Do not reposition
+objects while the controller is active.
+
+## 5. Launch and enable the policy
+
+```bash
+./isaac_os run gr00t_n1_7_wbc_g1 real -- \
+  --config-path=deployment/gr00t-real/control.yaml \
+  --model-config-path=deployment/gr00t-real/model.yaml \
+  --gamepad
+```
+
+Keep `--gamepad`: it enables the connected keyboard and requires explicit
+lower- and upper-body enables. Without it, the shipped configuration releases
+both automatically 60 seconds after the final startup pose.
+
+Wait for the startup routine to finish moving and hold its final pose. Then:
+
+1. Press **P** on the keyboard connected to Thor to enable the lower body.
+   Confirm stable balance before proceeding.
+2. With the task and camera setup checked and the operator ready, press **O**
+   to release the upper-body hold and allow GR00T N arm and hand commands.
+3. Leave locomotion at zero. Observe whether the G1 lifts the apple and releases
+   it onto the plate. Those are the observable success criteria; inference
+   readiness alone is not task completion.
+
+The policy keeps running after placement and may move the apple again.
+
+<Warning>
+Pressing **O** again gradually returns the upper body to its startup hold pose;
+it does not freeze the arms in place or disable actuation. **P** is a one-way
+lower-body enable latch. **Space** only zeros keyboard locomotion while held;
+it does not stop GR00T N arm commands. Use the approved stop/abort procedure for
+unexpected behavior.
+</Warning>
+
+<Accordion title="⚠️ The robot or enable keys do not respond">
+
+Check the robot-facing NIC, DDS domain (default `0`) and device-access messages.
+Confirm `--gamepad` is present and the selected keyboard is physically connected
+to Thor. Do not drop the flag to work around a missing enable input. Resolve
+input-device discovery before another launch; each launch repeats startup motion.
+
+</Accordion>
+
+## 6. Stop and prepare another attempt
+
+Follow the approved G1 procedure to secure the robot before ending active
+control. Press **Ctrl+C** in the application terminal to request graph shutdown
+and wait for it to exit. Process shutdown does not itself secure the robot.
+
+Once the robot is secured and the controller has stopped, reset the apple,
+plate and robot to the training arrangement. Repeat the workspace preparation,
+launch and enable sequence for another trial. Each new process repeats the
+startup routine and requires fresh enables.
+
+<Accordion title="❓ What should I record for each trial?">
+
+Record the Isaac OS commit (`git rev-parse HEAD`), model identity,
+configuration, hardware, and pickup and placement outcomes. Record later movement
+off the plate separately from successful placement. Simulation or Isaac ROS
+results do not establish this controller's physical success rate.
+
+</Accordion>

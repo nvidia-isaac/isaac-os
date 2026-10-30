@@ -1,0 +1,265 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Replay a recording into a graph
+
+<Note>
+Replaying a recording reproduces a run without the robot or sensors, so you can debug
+and compare changes on identical inputs. This guide plays an MCAP recording into a
+live graph at its recorded timing. To view a recording in Foxglove instead, see
+[Record data and view it in Foxglove](/isaac-os/how-to/record-and-inspect-data-with-mcap-and-foxglove).
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Replay a recording into a graph" hidePrompt actions={["cursor"]}>
+Find the recording, the topics and the destination graph in our conversation and
+project. Ask me for missing details.
+Follow [Replay a recording into a graph](/isaac-os/how-to/replay-a-recording-into-a-graph).
+Check the message mappings and timing. Then verify that the replay completes and
+the graph shuts down.
+</Prompt>
+</llms-ignore>
+
+## Before you start
+
+- You have a recording made with the MCAP logger, and a C++ Holoscan graph with an operator
+  input for each topic you want to replay.
+- To replay encoded video (`foxglove.CompressedVideo`), a build with the NVIDIA Video Codec SDK
+  and a GPU with a hardware video decoder.
+- The `isaac::common::mcap_replayer` library available to your build. Inside the Isaac OS
+  repository, [Build and run](/isaac-os/how-to/build-and-run) covers this. From your own project,
+  see [Integrate in your project](/isaac-os/how-to/integrate-in-your-project).
+
+The steps below are taken from the runnable
+[MCAP replay reference](/isaac-os/reference/applications/mcap-replay-reference).
+
+## Replay a recording into your own graph
+
+### Create the replayer
+
+Name every topic to replay together with the type its recorded messages decode to. The
+replayer needs no graph, so build it first:
+
+```cpp
+const std::string path = "/data/recording.mcap";
+isaac::os::mcap_replayer::McapReplayer replayer(
+    path, isaac::os::mcap_replayer::Topic<isaac::PoseCpuT>{"pose"});
+```
+
+### Wire each topic to a consumer
+
+Give your graph a reference to the replayer:
+
+```cpp
+class MyGraph final : public holoscan::Graph {
+ public:
+  explicit MyGraph(isaac::os::mcap_replayer::McapReplayer& replayer)
+      : Graph("my_graph"), replayer_(replayer) {}
+
+ private:
+  isaac::os::mcap_replayer::McapReplayer& replayer_;
+};
+```
+
+In `compose()`, declare a default clock, which `compile()` requires, then call `attach<T>()`
+once per topic with the operator input that should receive it. A topic you named but never
+attached is not read:
+
+```cpp
+void compose() override {
+  set_default_clock(add_clock<holoscan::RealtimeClock>("clock"));
+  auto sink = op<MySinkOp>("sink");
+  replayer_.attach<isaac::PoseCpuT>(*this, "pose", sink->in_pose);
+}
+```
+
+### Compile, run, then start the replayer
+
+Start the replayer after `run_async()`, not before, unlike the logger and the ROS 2 bridge:
+
+```cpp
+MyGraph graph(replayer);
+const holoscan::ExecutionPlan plan = holoscan::compile(graph);
+if (!plan.ok()) { /* log plan.diagnostics() */ return 1; }
+
+holoscan::RunSession run_session = holoscan::run_async(plan);
+replayer.start(plan.endpoint_catalog());
+```
+
+### Wait for the end, then stop
+
+`finished()` becomes true once the replayer has published everything, or the run gave up or
+failed. It does not mean your consumers have processed those messages, so if their results
+matter, wait for them before requesting the graph to stop. Stop the replayer, which logs the
+summary, then the graph:
+
+```cpp
+while (!replayer.finished()) {
+  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+replayer.stop();  // the destructor also does this
+run_session.request_stop();
+run_session.wait();
+```
+
+A replayer can be started once. To replay the file again, build a new `McapReplayer`.
+
+## Check the replay
+
+The run takes about as long as the recording did, because replay follows the recorded
+timeline. On `stop()` the replayer logs a per-topic summary. A healthy run reports every topic
+delivered, nothing refused and nothing unreadable.
+
+The counts are messages the replayer published, not messages your consumer processed. A consumer
+too slow to keep up loses its oldest unread messages without any message being refused.
+
+<Accordion title="📄 Example output">
+
+```text
+Replaying ".../mcap_log_20261008_211419.mcap" at 1x...
+[info] Topic 'sine_joint_state' delivered 100 messages to the consumer.
+[info]   Messages arrived 0.3 ms late on average and 8.7 ms late at worst.
+[info]   Replayed at 20.02 Hz, recorded at 20.01 Hz; messages kept the recording's own spacing to within 1.2 ms typically and 8.9 ms at worst.
+...
+[info] Every message read from the recording was delivered to the consumer on schedule.
+```
+
+</Accordion>
+
+## Change the speed or repeat the recording
+
+Pass `ReplayOptions` before the topics. `playback_speed` is recorded seconds per wall-clock
+second, so `2.0` replays in half the time. `loop` starts the recording over at its end, and
+the run then continues until you stop it:
+
+```cpp
+isaac::os::mcap_replayer::McapReplayer replayer(
+    path, isaac::os::mcap_replayer::ReplayOptions{.playback_speed = 2.0, .loop = true},
+    isaac::os::mcap_replayer::Topic<isaac::PoseCpuT>{"pose"});
+```
+
+## Replay a camera image topic
+
+Image topics are recorded in the logger's tensor envelope. Name them with a contract that bounds
+the frame size. A frame larger than the bound is refused when it is published:
+
+```cpp
+isaac::os::mcap_replayer::Topic<holoscan::schema::ImageT>{
+    "counter_image",
+    isaac::os::image_schema::ImageTensorFieldContract(
+        640, 480, holoscan::schema::ImageEncoding_RGB8)}
+```
+
+Replayed frames arrive in host memory.
+
+## Replay an encoded video topic
+
+Declare an encoded video topic like a raw image topic, naming the video topic rather than its
+`<topic>/metadata` channel. Each frame is decoded on the GPU and published as a host tensor.
+`video_decoder_cuda_device` in `ReplayOptions` picks the GPU that decodes (default 0):
+
+```cpp
+isaac::os::mcap_replayer::McapReplayer replayer(
+    path, isaac::os::mcap_replayer::ReplayOptions{.video_decoder_cuda_device = 0},
+    isaac::os::mcap_replayer::Topic<holoscan::schema::ImageT>{
+        "counter_image_encoded",
+        isaac::os::image_schema::ImageTensorFieldContract(
+            1920, 1080, holoscan::schema::ImageEncoding_RGB8)});
+```
+
+Size the contract for the encoding the video was recorded from: an `RGBA8` frame is larger than
+an `RGB8` one.
+
+<Note>
+- Video is lossy, so replayed colors match the recording only to within compression loss.
+- An `RGBA8` recording replays with alpha 255, because H.264 and H.265 carry no alpha.
+</Note>
+
+## Replay while also recording
+
+A graph has one flat namespace for imported and exported topics. If the same graph also records
+a topic with the logger, or runs two replays, set `operator_name` in `ReplayOptions` so the
+replayer's endpoints get a distinct prefix.
+
+## Try it with the reference apps
+
+Record five seconds of data. The app prints the path of the file it wrote:
+
+```bash
+./isaac_os run mcap_logger_reference -- --duration-s=5
+```
+
+Replay that file. Paths are inside the container, so a file under `mcap_logger_output/` is at
+`/workspace/isaac_os/mcap_logger_output/`:
+
+```bash
+./isaac_os run mcap_replay_reference -- \
+  --input-path=/workspace/isaac_os/mcap_logger_output/<file>.mcap
+```
+
+The reference app replays seven topics and exposes `--playback-speed=<number>` and `--loop`.
+A looping run ends on Ctrl+C and prints its summary.
+
+## If the replay is not what you expect
+
+<Accordion title="⚠️ The constructor throws">
+
+A topic name is not in the recording, or the type does not match what was recorded. This is
+checked before the graph is built. Check the topic names and types in the file.
+
+For encoded video it also throws if the `<topic>/metadata` channel is missing, the build has no
+NVIDIA Video Codec SDK, the GPU at `video_decoder_cuda_device` cannot decode the topic's codec
+(H.264 or H.265), or the topic's first video message is missing or damaged. The message says
+which.
+
+</Accordion>
+
+<Accordion title="⚠️ The run reports it never began">
+
+A consumer did not subscribe within 5 seconds, or reading made no progress for 5 seconds. The
+summary names the topic. Nothing was sent.
+
+</Accordion>
+
+<Accordion title="⚠️ Fewer video frames replay than were recorded">
+
+A video frame and its metadata message are joined on their log time. A message whose partner is
+missing is left out, and a warning at the end of the pass says how many. A frame that fails to
+decode, has an odd size, or decodes to a size other than its metadata's is dropped and counted.
+
+</Accordion>
+
+<Accordion title="⚠️ Messages are refused or lost">
+
+A refusal means a message could not be published, usually because the consumer's graph stopped.
+The replayer does not slow down for a slow consumer: it drops the consumer's oldest unread
+messages to keep the recording's timing. Make the consumer faster or lower `playback_speed`.
+
+</Accordion>
+
+<Accordion title="⚠️ The summary lists a few late messages at the start">
+
+The first messages on a topic can go out slower than the rest while replay warms up. The summary
+gives a topic with late messages a line like `2 went out more than 10 ms after they were due
+(messages #1, #4)`, with their message numbers on that topic. The numbers count the messages
+delivered on that topic, so they match the recording's own order only while none were skipped; the
+topic's unreadable and refused counts show when some were. If the numbers are only the first few
+and the topic's average lateness and spacing stay low, the contents and the rest of the timing
+are unaffected and no action is needed. If many messages are late, or the numbers are spread
+through the run, the replay is falling behind during steady state: lower `playback_speed`, make
+the consumer faster, or use a less busy machine. A looping replay also logs the late messages of
+each pass as the recording starts over, since its summary only comes when the run ends. A topic
+with a single message per pass has no restart to report at, so its late messages are listed for the
+whole run.
+
+</Accordion>
+
+## Related
+
+- [Library README](../../common/mcap_replayer/README.md):
+  every option, how pacing works and how to read the summary statistics.
+
+- [MCAP replay reference](/isaac-os/reference/applications/mcap-replay-reference): the runnable
+  app and its flags.

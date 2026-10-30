@@ -1,0 +1,42 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "run",
+    "description": "Minimal reference application for common/ros2_bridge: a clock-driven op emits a circular-motion isaac.PoseCpu, to_ros2 publishes it as a geometry_msgs/PoseStamped on /ros2_bridge_reference/pose_out, an external ROS2 node relays it to /ros2_bridge_reference/pose_in, from_ros2 subscribes that topic back into the graph, and a logging op prints what came back -- a full Holoscan-ROS2-Holoscan round trip in one process. When ros2_bridge has the CUDA buffer backend and a CUDA device is present, a 640x480 sensor_msgs/Image also round-trips through ROS2 as a CUDA buffer, with the frame in GPU memory from the generator through ROS and back into the graph (the check operator copies it to the host only to verify the pixels).",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "run": {
+        "description": "Publish circular_pose to /ros2_bridge_reference/pose_out, relay it through an external ROS2 node, and read it back on /ros2_bridge_reference/pose_in for 10 seconds.",
+        "run": {
+          "command": "<isaac_app_bin>/ros2_bridge_reference --duration-s=10",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "ros2_bridge_reference",
+    "platforms": [
+      "x86_64",
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "tags": [
+      "example",
+      "reference",
+      "ros2"
+    ],
+    "version": "0.1.0"
+  }
+}

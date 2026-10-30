@@ -1,0 +1,89 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# For agents
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Start with Isaac OS" hidePrompt actions={["cursor"]}>
+Read [For agents](/isaac-os/for-agents). If there are no clear Isaac OS tasks
+in our conversation or project, ask me for missing details.
+</Prompt>
+
+The Isaac OS documentation was written for people and coding agents alike, with
+capabilities of the framework documented in the How-to guides. Provide them to your
+coding agent using any of these:
+
+<CardGroup cols={3}>
+<Card title="Start from the docs" icon="sparkles">
+
+Copy the ✨ prompt from a How-to guide to feed to your agent, or open it in Cursor
+directly from the hosted documentation website. You can also give your agent the URL
+of this page.
+
+</Card>
+<Card title="Install the skills" icon="puzzle-piece">
+
+To let your agent find Isaac OS by itself, copy the directories in [skills/](../skills),
+at your Isaac OS tag or commit, into your agent's skill directory.
+
+</Card>
+<Card title="Connect the docs MCP server" icon="plug">
+
+Use **Connect to Cursor** or **Connect to Claude Code** in the page header. For
+Codex, run:
+
+```bash
+codex mcp add isaac-os-docs --url https://docs.nvidia.com/isaac-os/_mcp/server
+```
+
+</Card>
+</CardGroup>
+
+Your agent reads the instructions below.
+</llms-ignore>
+
+<Accordion title="Agent instructions">
+
+Follow this page to do an Isaac OS task for a user, in an Isaac OS checkout or in a
+project that uses Isaac OS.
+
+**Find Isaac OS**
+
+Find the Isaac OS version: run `git describe --tags --always` in a checkout, or
+read `GIT_TAG` in `FetchContent_Declare(isaac_os …)`. A FetchContent source directory,
+such as `build/_deps/isaac_os-src`, is a checkout. Ask the user only if you cannot find
+the version.
+
+If an Isaac OS checkout is present, read the docs under `docs/`.
+`docs/fern/index.yml` maps each page URL to its file. Otherwise, use
+https://docs.nvidia.com/isaac-os/llms.txt for your Isaac OS version. If your
+version is not listed, read `docs/` in the
+[source repository](https://github.com/nvidia-isaac/isaac-os) at your tag or commit.
+
+**Find the task**
+
+Use the guide list in the docs to see what Isaac OS covers. Then find the user's task
+in the conversation and the project: what to do, and for which application, platform
+or run mode. If it is unclear, ask the user before you continue.
+
+**Do the task**
+
+1. Find the guide for the task, usually a How-to guide. Read its prerequisites and success criteria.
+2. To measure performance, use the
+   [data-flow-profiling skill](../skills/data-flow-profiling/SKILL.md). To improve
+   performance, use the
+   [optimize-application skill](../skills/optimize-application/SKILL.md). You can read
+   a skill without installing it.
+3. Follow the guide in the user's project, with its build system. `./isaac_os` commands
+   apply only to an Isaac OS checkout. Do not assume that `AGENTS.md` or `skills/` from
+   a dependency are loaded; read them when you need them.
+4. If you cannot read the user's project or run commands, say so. Give the user the
+   commands to run and ask for the output.
+5. If a page or section is marked incomplete, report the missing procedure. Do not
+   invent commands.
+6. Check the result. Report the Isaac OS version, the changes, the commands you ran,
+   the artifacts, and what still needs validation.
+
+</Accordion>

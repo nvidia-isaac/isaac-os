@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "forceConsistentCasingInFileNames": true,
+    "lib": [
+      "dom"
+    ],
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "extends": "create-foxglove-extension/tsconfig/tsconfig.json",
+  "include": [
+    "./src/**/*"
+  ]
+}

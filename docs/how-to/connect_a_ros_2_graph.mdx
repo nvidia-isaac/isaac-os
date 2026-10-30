@@ -1,0 +1,351 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Exchange Messages with ROS 2
+
+<Note>
+Send a Holoscan graph's output to an existing ROS 2 node and receive that node's
+messages back into the graph.
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Exchange messages with ROS 2" hidePrompt actions={["cursor"]}>
+Find the graph, ROS 2 nodes, topics and message types in our conversation and
+project. Ask me for missing details.
+Follow [Exchange Messages with ROS 2](/isaac-os/how-to/connect-a-ros-2-graph).
+Map the messages, topics and QoS. Then verify that messages go in both directions
+and that the graph shuts down correctly.
+</Prompt>
+</llms-ignore>
+
+## Before you start
+
+- You have a C++ Holoscan graph, with the `isaac::common::ros2_bridge` library and ROS 2
+  (`rclcpp` plus your message packages) available to your build. Inside the Isaac OS repository,
+  [Build and run](/isaac-os/how-to/build-and-run) covers this. From your own project, see
+  [Integrate in your project](/isaac-os/how-to/integrate-in-your-project).
+- Your graph and the ROS 2 node run on the same host, with the same `ROS_DOMAIN_ID` and,
+  if you set it, the same `RMW_IMPLEMENTATION`.
+- The ROS 2 node's QoS is compatible with the bridge topic's QoS, which defaults to reliable,
+  volatile, keep last 10. To change it, see [Match a node's QoS](#match-a-nodes-qos).
+
+The steps below are taken from the runnable
+[ROS 2 bridge reference](/isaac-os/reference/applications/ros2-bridge-reference),
+which publishes a pose, has an external ROS 2 node relay it, and receives it back.
+
+## Connect the graph
+
+### Create the bridge
+
+The string names the `rclcpp::Node` the bridge runs under:
+
+```cpp
+isaac::os::ros2_bridge::Ros2Bridge<> bridge("my_app_bridge");
+```
+
+### Wire ports to topics
+
+Give your graph a reference to the bridge:
+
+```cpp
+class MyGraph final : public holoscan::Graph {
+ public:
+  explicit MyGraph(isaac::os::ros2_bridge::Ros2Bridge<>& bridge)
+      : Graph("my_graph"), bridge_(bridge) {}
+
+ private:
+  isaac::os::ros2_bridge::Ros2Bridge<>& bridge_;
+};
+```
+
+Then declare a default clock, which `compile()` requires, and wire ports in `compose()`.
+`to_ros2` publishes an operator `Output` to a ROS 2 topic. `from_ros2` delivers a ROS 2 topic to
+an operator `Input`:
+
+```cpp
+void compose() override {
+  set_default_clock(add_clock<holoscan::RealtimeClock>("clock"));
+
+  auto generator = op<PoseGeneratorOp>("pose_generator");
+  bridge_.to_ros2<geometry_msgs::msg::PoseStamped, isaac::PoseCpuT>(
+      *this, generator->out_pose, {.port_name = "out_pose", .ros2_topic = "/pose_out"});
+
+  auto logger = op<PoseLoggerOp>("pose_logger");
+  bridge_.from_ros2<geometry_msgs::msg::PoseStamped, isaac::PoseCpuT>(
+      *this, logger->in_pose, {.port_name = "in_pose", .ros2_topic = "/pose_in"});
+}
+```
+
+The reference app's `ReferenceGraph` shows the complete class.
+
+### Compile, start the bridge, then run
+
+Compile the graph, start the bridge with the plan's endpoint catalog, then run the graph.
+`start()` initializes `rclcpp` for the process, so create any other in-process ROS 2 node
+after it:
+
+```cpp
+MyGraph graph(bridge);
+const holoscan::ExecutionPlan plan = holoscan::compile(graph);
+if (!plan.ok()) { /* log plan.diagnostics() */ return 1; }
+
+bridge.start(plan.endpoint_catalog());
+holoscan::RunSession run_session = holoscan::run_async(plan);
+```
+
+### Stop the graph, then the bridge
+
+When you are done, stop the graph first and the bridge second:
+
+```cpp
+run_session.request_stop();
+run_session.wait();
+bridge.stop();
+```
+
+## Check that it works
+
+Run your app and, from a second ROS 2 shell, check the rate of each bridged topic:
+
+```bash
+ros2 topic hz <topic>
+```
+
+Use `ros2 topic echo <topic>` to inspect the values.
+
+To try the steps first, run the reference app. Its generator runs at 20 Hz, so the rate on its
+published topic should be about 20 Hz:
+
+```bash
+./isaac_os run ros2_bridge_reference -- --duration-s=30
+```
+
+```bash
+ros2 topic hz /ros2_bridge_reference/pose_out
+```
+
+On exit the reference app logs the poses sent, relayed and received. The three counts should
+match, and the app exits non-zero if no pose completed the round trip.
+
+If the bridge was built with the CUDA buffer backend and the machine has a CUDA device, the app
+also round-trips a 640x480 image through ROS 2 as a CUDA buffer, and logs the image counts too.
+Otherwise it warns that the GPU image path is skipped and runs the pose round trip alone. If the
+backend plugin is missing from the process, the relay receives the image in host memory and the
+app fails and says so.
+
+<Accordion title="📄 Example output with the GPU image path">
+
+With a 10-second run. Log prefixes and ROS middleware messages are omitted:
+
+```text
+Publishing circular_pose to /ros2_bridge_reference/pose_out, relaying through an external ROS2 node, and reading it back on /ros2_bridge_reference/pose_in for 10s; Ctrl+C stops it early.
+Also round-tripping a 640x480 image as a CUDA buffer through /ros2_bridge_reference/image_out and /ros2_bridge_reference/image_in.
+[info] PoseLoggerOp received 200 poses.
+[info] PoseGeneratorOp sent 200 poses.
+[info] ImageGeneratorOp sent 200 images.
+[info] ImageCheckOp received 200 images (0 wrong).
+[info] External relay node relayed 200 poses.
+[info] External relay node relayed 200 images as CUDA buffers.
+```
+
+</Accordion>
+
+## Publish one output on several topics
+
+Call `to_ros2` once per topic with the same output and a different `port_name`:
+
+```cpp
+bridge_.to_ros2<sensor_msgs::msg::JointState, isaac::JointStateCpuT>(
+    *this, my_op->joint_command_out,
+    {.port_name = "joint_command_a", .ros2_topic = "/joint_commands_a"});
+bridge_.to_ros2<sensor_msgs::msg::JointState, isaac::JointStateCpuT>(
+    *this, my_op->joint_command_out,
+    {.port_name = "joint_command_b", .ros2_topic = "/joint_commands_b"});
+```
+
+## Match a node's QoS
+
+Set `qos` on the topic spec to match the ROS 2 node. A reliable subscription does not match a
+best-effort publisher, which is typical of camera drivers, and the topic stays silent. For such a
+publisher, use `rclcpp::SensorDataQoS()`:
+
+```cpp
+bridge_.from_ros2<sensor_msgs::msg::Image, holoscan::schema::ImageT>(
+    *this, my_op->image_in,
+    {.port_name = "camera_in",
+     .ros2_topic = "/camera/image_raw",
+     .qos = rclcpp::SensorDataQoS()});
+```
+
+## Receive camera images
+
+The default converter converts between `sensor_msgs/msg/Image` and `holoscan::schema::ImageT`. The
+pixels can stay in host memory, which is the default (`memory_kind = kHost`), or in GPU memory.
+
+### In host memory
+
+The default size bound is 8 MiB, which covers a 1080p `rgb8` frame. For larger frames, set
+`max_tensor_bytes` to width × height × bytes per pixel. For a 4K `rgb8` frame:
+
+```cpp
+bridge_.from_ros2<sensor_msgs::msg::Image, holoscan::schema::ImageT>(
+    *this, my_op->image_in,
+    {.port_name = "image_in",
+     .ros2_topic = "/camera/image",
+     .max_tensor_bytes = 3840ULL * 2160 * 3,
+     .publisher_memory = isaac::os::ros2_bridge::Ros2MemoryKind::kHost});
+```
+
+`publisher_memory` says what the ROS publisher sends. A host topic works without it, but setting it
+to `kHost` states that the publisher sends host memory, and keeps the topic correct if you later
+move it to GPU memory.
+
+### In GPU memory
+
+A GPU ROS publisher can feed GPU operators with no copy through host memory. This needs the CUDA
+buffer backend in your build and in every ROS process involved. Set `memory_kind` to
+`kCudaDevice`. The bridge puts all of its device topics on one GPU, which you choose with
+`pool_device` when you construct it:
+
+```cpp
+isaac::os::ros2_bridge::Ros2Bridge<> bridge("my_app_bridge", /*pool_device=*/0);
+```
+
+```cpp
+bridge_.from_ros2<sensor_msgs::msg::Image, holoscan::schema::ImageT>(
+    *this, my_op->image_in,
+    {.port_name = "image_in",
+     .ros2_topic = "/camera/image",
+     .memory_kind = isaac::os::ros2_bridge::Ros2MemoryKind::kCudaDevice});
+```
+
+The SDK does not guess a CUDA device, so bind the imported topic to the bridge's GPU and pass the
+options to `compile()`:
+
+```cpp
+holoscan::CompileOptions options;
+options.deployment.bind_imported_topic_device(
+    {.endpoint_name = "image_in", .device = holoscan::DeviceId{bridge.pool_device()}});
+const holoscan::ExecutionPlan plan = holoscan::compile(graph, options);
+```
+
+If a ROS node in the same process as the bridge publishes or subscribes these GPU images, turn on
+intra-process communication for both the bridge and that node, as the reference app does. The
+images are then handed over in place. Nodes in other processes need nothing:
+
+```cpp
+isaac::os::ros2_bridge::Ros2Bridge<> bridge(
+    "my_app_bridge", /*pool_device=*/0, rclcpp::NodeOptions().use_intra_process_comms(true));
+auto node = std::make_shared<rclcpp::Node>(
+    "my_node", rclcpp::NodeOptions().use_intra_process_comms(true));
+```
+
+Other combinations are possible, such as a host publisher feeding a GPU topic, or publishing a GPU
+tensor with `to_ros2`.
+
+See the
+[library README](../../common/ros2_bridge/README.md#gpu-resident-images-memory_kind)
+for each case.
+
+
+## Sample a ROS 2 input by time
+
+If an operator reads a `from_ros2` port with `LatestWithin`, `Exact`, `DrainAll`, `OnAligned` or
+`BracketedWindow`, each message needs a capture time. Set `capture_time_clock` to the graph clock.
+The bridge uses each message's `header.stamp` as its capture time.
+
+```cpp
+const holoscan::ClockKey clock = add_clock<holoscan::RealtimeClock>(
+    "clock", holoscan::RealtimeClock::Config{.use_time_since_epoch = true});
+set_default_clock(clock);
+bridge_.from_ros2<geometry_msgs::msg::PoseStamped, isaac::PoseCpuT>(
+    *this, my_op->pose_in,
+    {.port_name = "pose", .ros2_topic = "/pose", .capture_time_clock = clock});
+```
+
+The clock must count the same time as the ROS 2 stamps. For wall-clock ROS 2, that is
+`use_time_since_epoch = true`, as above. A message type with no header, such as `Pose`, is stamped
+with the time the bridge received it, and the bridge logs a warning. Triggers that fire on arrival,
+such as `OnEach`, do not need a capture time.
+
+## Use your own message type
+
+Register a converter for the pair, extend the built-in set, and pass it to the bridge:
+
+```cpp
+struct MyConverter : isaac::os::ros2_bridge::DefaultRos2Converter {
+  using SupportedPairs = decltype(std::tuple_cat(
+      DefaultRos2Converter::SupportedPairs{},
+      std::tuple<isaac::os::ros2_bridge::Converter<my_msgs::msg::Custom, my::CustomT>>{}));
+};
+
+isaac::os::ros2_bridge::Ros2Bridge<MyConverter> bridge("my_app_bridge");
+```
+
+The `Converter` specialization itself is described in the
+[library README](../../common/ros2_bridge/README.md#adding-a-custom-converter).
+
+
+## If the topic is not what you expect
+
+<Accordion title="⚠️ compile() fails with EXTERNAL_CHANNEL_PLAN_INVALID">
+
+A `from_ros2` port is wired to more than one operator. Wire it to one.
+
+</Accordion>
+
+<Accordion title="⚠️ The first messages are missing">
+
+Messages published before ROS 2 discovery matches the publisher and subscriber can be dropped,
+which is normal for a stream. If you need the first message, wait about 200 ms between
+`start()` and `run_async()`, as the reference app does.
+
+</Accordion>
+
+<Accordion title="⚠️ A topic stays silent and rclcpp warns about incompatible QoS">
+
+The publisher and subscriber QoS do not match. Set `qos` on the topic spec to match the ROS 2
+node. See [Match a node's QoS](#match-a-nodes-qos).
+
+</Accordion>
+
+<Accordion title="⚠️ compile() fails with IMPLICIT_DEVICE_ZERO_REJECTED">
+
+A GPU topic has no device binding. Bind the imported topic, or the operator that produces an
+exported topic's tensor, in the options you pass to `compile()`. See
+[In GPU memory](#in-gpu-memory).
+
+</Accordion>
+
+<Accordion title="⚠️ A from_ros2 or to_ros2 call does not compile">
+
+The `<Ros2T, HsdkT>` pair is not registered. See
+[Use your own message type](#use-your-own-message-type).
+
+</Accordion>
+
+<Accordion title="⚠️ compile() fails with TEMPORAL_CAPTURE_TIME_REQUIRED">
+
+An operator reads a `from_ros2` port with an event-time selector, and the port has no capture time.
+Set `capture_time_clock` on that port's topic spec. See
+[Sample a ROS 2 input by time](#sample-a-ros-2-input-by-time).
+
+</Accordion>
+
+<Accordion title="⚠️ LatestWithin never selects a message">
+
+The graph clock and the ROS 2 stamps do not count the same time, usually because the graph uses a
+default `RealtimeClock`, which counts from its own start. Create it with
+`use_time_since_epoch = true`. See [Sample a ROS 2 input by time](#sample-a-ros-2-input-by-time).
+
+</Accordion>
+
+## Related
+
+- [Library README](../../common/ros2_bridge/README.md):
+  built-in message pairs, converter contracts, tensor messages, capture time and wiring limits.
+
+- [ROS 2 bridge reference](/isaac-os/reference/applications/ros2-bridge-reference):
+  the runnable app and its run options.

@@ -1,0 +1,602 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Optimize your host
+
+<Note>
+CPU and GPU frequency changes, idle states and background work cause latency spikes
+that make control loops jitter and benchmarks hard to reproduce. This guide reduces
+them on AGX Thor or Linux x86_64 with an NVIDIA GPU, then checks the result.
+See [platform support](/isaac-os/reference/platforms) for device and software versions.
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Optimize my host" hidePrompt actions={["cursor"]}>
+Find my host platform and its workload in our conversation and project. Ask me
+for missing details.
+Follow [Optimize your host](/isaac-os/how-to/optimize-your-host) to inspect the
+host and apply the applicable settings. Check the effective settings. Before you
+apply a change that needs a reboot or ends graphical sessions, tell me.
+</Prompt>
+</llms-ignore>
+
+## Before tuning
+
+- On AGX Thor, check your host first with
+  [`tools/host_preflight.py`](../../tools/host_preflight.py) from the checkout root,
+  and skip sections that already match the reference configuration:
+
+  ```bash
+  sudo -v
+  python3 tools/host_preflight.py
+  ```
+
+  Results describe the current boot. Clock locks and runtime `sysctl` changes reset
+  at reboot unless you persist them, so check again after rebooting. See
+  [Check your configuration](#check-your-configuration) to interpret the findings.
+- Record your starting settings so you can restore them.
+- Stop unrelated GPU workloads and profilers before comparing runs.
+- Check effective settings after each change and measure the same workload again.
+- Record CPU, GPU, driver, CUDA, kernel and tuning settings with your results.
+
+Higher clocks and reduced CPU idle time increase power use and cooling needs.
+Choose settings for your workload rather than applying every option.
+
+## Install the host and kernel
+
+Choose the installation and kernel first; later boot options apply to the selected kernel.
+
+<Tabs>
+<Tab title="AGX Thor">
+
+<Anchor id="jetpack-headless-minimal-bsp" />
+
+### Keep the host installation small
+
+Container-based applications need the Jetson Linux board support package (BSP),
+drivers and container runtime. They do not need host copies of the full JetPack
+SDK, samples and developer tools. See [Build and run prerequisites](/isaac-os/how-to/build-and-run#prerequisites)
+for the container runtime.
+
+| Installation method | Minimal host choice |
+| --- | --- |
+| [AGX Thor ISO installer][thor-quickstart] | Install the BSP; the installer includes Docker/container setup without the full JetPack SDK |
+| [SDK Manager][sdkm] | Flash Jetson OS; omit optional Jetson SDK components in the second stage |
+
+The desktop is part of the default root filesystem even with Jetson OS alone;
+follow [Run without a desktop](#run-without-a-desktop) after installation if you do not need it.
+
+<Anchor id="jetpack-rt-kernel" />
+
+### Use a real-time kernel
+
+`PREEMPT_RT` allows more kernel work to be preempted, which can reduce scheduling
+jitter. Follow the [Jetson Linux R39.2.1 real-time kernel instructions][rt-kernel]
+for packages matching your installed release. The RT kernel can be installed
+alongside the generic kernel without reflashing.
+
+<Warning>
+This real-time kernel is available as a Developer Preview. Evaluate it for your
+workload before choosing it for deployment.
+</Warning>
+
+After installing the RT kernel, set `DEFAULT` in `/boot/extlinux/extlinux.conf`
+to `real-time` and reboot. Check the running kernel:
+
+```bash
+uname -r
+cat /sys/kernel/realtime
+```
+
+The latter must report `1` for PREEMPT_RT; the kernel name alone is not proof.
+
+<Accordion title="Restore the generic kernel">
+
+Set `DEFAULT` in `/boot/extlinux/extlinux.conf` to `primary` and reboot.
+
+</Accordion>
+
+</Tab>
+<Tab title="Linux x86_64">
+
+<Warning>
+Linux x86_64 is untested; see the [support matrix](/isaac-os/reference/platforms).
+The settings on this page have not been validated on x86_64 hosts, and their
+effect varies with system specifications.
+</Warning>
+
+Start from a supported Linux installation with the NVIDIA driver; see
+[platform support](/isaac-os/reference/platforms) for versions and
+[Build and run prerequisites](/isaac-os/how-to/build-and-run#prerequisites)
+for the container runtime.
+
+This guide does not cover real-time kernels for x86_64. The remaining sections
+apply to the kernel your distribution provides.
+
+</Tab>
+</Tabs>
+
+<Anchor id="performance-tuning" />
+
+## Reduce scheduling interference
+
+Latency-critical work, such as a control loop, runs best on CPUs that the scheduler,
+interrupts and kernel threads leave alone. Reserve housekeeping CPUs for system work
+and isolate the rest with boot options. Applications then place their critical
+threads on the isolated CPUs; see
+[Isolate CPU execution](/isaac-os/how-to/optimize-an-application#isolate-cpu-execution).
+
+The examples reserve CPUs 0-7 for system work and isolate CPUs 8-13. Replace both
+CPU lists with the logical CPU IDs for your host, and keep at least one housekeeping CPU.
+Make sure you can access the host console before editing boot settings. Keep the
+backup across reboots; if the backup filename already exists, choose a new name
+instead of overwriting an earlier backup.
+
+<Tabs>
+<Tab title="AGX Thor">
+
+The prebuilt JetPack 7.2.1 kernels support these isolation options, which the Thor
+reference setup uses:
+
+```text
+isolcpus=domain,managed_irq,8-13 irqaffinity=0-7 kthread_cpus=0-7
+```
+
+<Accordion title="❓ What do these options do?">
+
+- `isolcpus=domain` removes CPUs from scheduler load balancing. `managed_irq`
+  asks the kernel to avoid them for managed interrupts, on a
+  [best-effort basis][managed-irq].
+- `irqaffinity` sets the default IRQ CPUs; `kthread_cpus` selects CPUs for
+  eligible kernel threads. Neither guarantees all interrupts or threads move.
+
+</Accordion>
+
+<Accordion title="Optional: enable tickless and RCU offload with a custom-built kernel">
+
+`nohz_full` suppresses scheduler ticks on selected CPUs when possible;
+`rcu_nocbs` offloads their RCU callbacks. These options require a custom-built
+PREEMPT_RT kernel with `CONFIG_NO_HZ_FULL` and `CONFIG_RCU_NOCB_CPU` enabled. See
+the [Jetson Linux real-time kernel build instructions][rt-kernel]. The prebuilt
+kernel does not enable them, so the reference configuration omits them. The
+preflight reports missing kernel support or notes that a supported configuration
+differs from the reference.
+
+</Accordion>
+
+After installing the selected kernel, save a backup of the boot configuration:
+
+```bash
+sudo cp -a --no-clobber /boot/extlinux/extlinux.conf "$HOME/extlinux.conf.before-isaac-os"
+```
+
+Edit the `APPEND` line for the boot entry you use in `/boot/extlinux/extlinux.conf`.
+Append the options on that same line without removing existing arguments. If you
+installed the RT kernel, check which entry `DEFAULT` selects (`real-time` or `primary`).
+Reboot.
+
+<Accordion title="Restore the boot configuration">
+
+Restore the saved file and reboot. Only use this backup while the kernel files
+referenced by its entries are still installed:
+
+```bash
+sudo cp -a "$HOME/extlinux.conf.before-isaac-os" /boot/extlinux/extlinux.conf
+sudo reboot
+```
+
+</Accordion>
+
+</Tab>
+<Tab title="Linux x86_64">
+
+<Warning>
+Not validated on x86_64; results vary with the kernel and system.
+</Warning>
+
+Most distribution kernels also support tickless operation and RCU callback offload.
+Check that your kernel enables `CONFIG_NO_HZ_FULL` and `CONFIG_RCU_NOCB_CPU`:
+
+```bash
+grep -E 'CONFIG_NO_HZ_FULL|CONFIG_RCU_NOCB_CPU' "/boot/config-$(uname -r)"
+```
+
+If both are `y`, use:
+
+```text
+nohz=on nohz_full=8-13 rcu_nocbs=8-13 rcu_nocb_poll isolcpus=domain,managed_irq,8-13 irqaffinity=0-7 kthread_cpus=0-7
+```
+
+Otherwise, omit `nohz`, `nohz_full`, `rcu_nocbs` and `rcu_nocb_poll`. Choose CPU
+lists that keep SMT siblings together and respect NUMA nodes; `lscpu -e` lists both.
+
+<Accordion title="❓ What do these options do?">
+
+- `nohz=on` enables dynamic ticks; `nohz_full` suppresses ticks on selected CPUs
+  when possible.
+- `rcu_nocbs` offloads RCU callbacks; `rcu_nocb_poll` makes the offload threads
+  poll, trading power for lower wakeup latency.
+- `isolcpus=domain` removes CPUs from scheduler load balancing. `managed_irq`
+  asks the kernel to avoid them for managed interrupts, on a
+  [best-effort basis][managed-irq].
+- `irqaffinity` sets the default IRQ CPUs; `kthread_cpus` selects CPUs for
+  eligible kernel threads. Neither guarantees all interrupts or threads move.
+
+See also the [DAQIRI CPU isolation example][daqiri-cpu-isolation].
+
+</Accordion>
+
+With GRUB, save the configuration before editing it:
+
+```bash
+sudo cp -a --no-clobber /etc/default/grub "$HOME/grub.before-isaac-os"
+```
+
+Add the options inside `GRUB_CMDLINE_LINUX` in `/etc/default/grub`, preserving any
+existing options. Run `sudo update-grub` and reboot. See
+[Ubuntu's GRUB instructions][grub-kernel-options].
+
+<Accordion title="Restore the boot configuration">
+
+Restore the saved configuration and regenerate GRUB:
+
+```bash
+sudo cp -a "$HOME/grub.before-isaac-os" /etc/default/grub
+sudo update-grub
+sudo reboot
+```
+
+</Accordion>
+
+</Tab>
+</Tabs>
+
+Check `cat /proc/cmdline` after reboot and inspect `/proc/interrupts` under load.
+If you used a different backup filename, substitute it in the restore command.
+
+## Real-time CPU budget
+
+For real-time benchmarks, disable RT bandwidth throttling, as the AGX Thor reference
+configuration does. A finite budget can suspend continuously runnable real-time
+workers until the next budget period, adding periodic latency spikes under load.
+
+Record the current value before changing it:
+
+```bash
+sysctl kernel.sched_rt_runtime_us
+sudo sysctl -w kernel.sched_rt_runtime_us=-1
+```
+
+Disabling this limit removes the CPU-time reserve for ordinary tasks. A runaway
+real-time worker can starve other work on its CPU. Keep benchmark workers on the
+isolated CPUs and reserve the housekeeping CPUs for system services.
+
+To retain the setting after reboot, add this line to
+`/etc/sysctl.d/90-isaac-os-rt.conf`:
+
+```ini
+kernel.sched_rt_runtime_us = -1
+```
+
+After reboot, verify `sysctl kernel.sched_rt_runtime_us` reports `-1`.
+To undo the change, remove that line and restore the value you recorded with
+`sudo sysctl -w kernel.sched_rt_runtime_us=<previous-value>`.
+
+## Power mode and clocks
+
+Lock clocks after the boot changes above.
+
+<Tabs>
+<Tab title="AGX Thor">
+
+For JetPack 7.2.1, check the [AGX Thor power guide][thor-power] and confirm which
+mode ID selects the power budget you need. The AGX Thor reference uses the qualified
+120W mode (mode `1` on T5000).
+
+<Accordion title="❓ Why not MAXN?">
+
+MAXN is an experimental mode for adjusting clock settings and creating custom
+power profiles. We do not recommend prolonged heavy workloads in this mode.
+Higher clock limits do not guarantee higher sustained performance:
+exceeding the platform power budget can trigger throttling. Use the qualified
+120W profile for reference comparisons; treat MAXN measurements as a separate
+configuration. See the [AGX Thor power guide][thor-power].
+
+</Accordion>
+
+Record the current mode and save clock settings:
+
+```bash
+sudo nvpmodel -q
+sudo jetson_clocks --show
+sudo jetson_clocks --store
+```
+
+`jetson_clocks` locks CPU, GPU and memory clocks to the selected power mode's maximums.
+For the reference setup, select 120W before locking clocks. Follow any reboot
+request from `nvpmodel` before locking clocks:
+
+```bash
+sudo nvpmodel -m 1
+sudo jetson_clocks
+sudo nvpmodel -q
+sudo jetson_clocks --show
+```
+
+On the supported Thor installation, `jetson_clocks` also disables CPU idle states.
+The [preflight](#check-your-configuration) verifies the exposed idle-state controls;
+there is no separate PM QoS resume-latency setting to apply.
+
+### Keep the settings after reboot
+
+The power mode persists across reboots; clock locks do not. To lock clocks at
+every boot, create `/etc/systemd/system/isaac-os-jetson-clocks.service`:
+
+```ini
+[Unit]
+Description=Lock Jetson clocks for Isaac OS
+After=nvpmodel.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/jetson_clocks
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable it, reboot, then check `sudo jetson_clocks --show`:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable isaac-os-jetson-clocks.service
+sudo reboot
+```
+
+To stop locking clocks at boot, run
+`sudo systemctl disable isaac-os-jetson-clocks.service` and reboot.
+
+<Accordion title="Restore power and clock settings">
+
+If you enabled the boot service, disable it first. To restore a different power mode, run `sudo nvpmodel -m <saved-mode-id>` and
+reboot. The reboot also clears the clock locks.
+
+If you are keeping the current power mode, restore the saved clocks instead:
+
+```bash
+sudo jetson_clocks --restore
+```
+
+</Accordion>
+
+</Tab>
+<Tab title="Linux x86_64">
+
+### CPU governor and idle states
+
+Install your distribution's `cpupower` tools. Record each CPU's governor and idle
+settings before changing them:
+
+```bash
+cpupower -c all frequency-info
+cpupower -c all idle-info
+sudo cpupower -c all frequency-set -g performance
+sudo cpupower -c all idle-set -D 1
+```
+
+Repeat the two inspection commands to check the result. `-D 1` disables idle states
+with exit latency of 1 microsecond or greater; this can substantially increase idle power.
+
+<Accordion title="Restore CPU settings">
+
+Restore the recorded governor (per CPU if the starting governors differed):
+
+```bash
+sudo cpupower -c all frequency-set -g <recorded-governor>
+```
+
+If all idle states were enabled before, re-enable them:
+
+```bash
+sudo cpupower -c all idle-set -E
+```
+
+Otherwise, use `idle-set -e <state-number>` to re-enable only the recorded states.
+
+</Accordion>
+
+### GPU persistence and clocks
+
+The example selects GPU `0`. Record its current settings, inspect supported clocks,
+then enable persistence and lock GPU and memory clocks to their reported maximums:
+
+```bash
+nvidia-smi -i 0 -q
+nvidia-smi -i 0 -q -d SUPPORTED_CLOCKS
+sudo nvidia-smi -i 0 -pm 1
+sudo nvidia-smi -i 0 -lgc="$(nvidia-smi -i 0 --query-gpu=clocks.max.sm --format=csv,noheader,nounits)"
+sudo nvidia-smi -i 0 -lmc="$(nvidia-smi -i 0 --query-gpu=clocks.max.memory --format=csv,noheader,nounits)"
+nvidia-smi -i 0 -q
+```
+
+Clock locking is device-dependent. If a control is unsupported, omit it rather
+than assuming the clock was locked. See the [NVIDIA SMI reference][nvidia-smi].
+
+<Accordion title="Restore GPU settings">
+
+Reset clock locks to defaults:
+
+```bash
+sudo nvidia-smi -i 0 -rgc
+sudo nvidia-smi -i 0 -rmc
+```
+
+If you had custom clock locks, reapply those instead. Restore persistence mode to
+its recorded value (`sudo nvidia-smi -i 0 -pm 0` if it was disabled). Defaults may
+differ from your starting settings; rebooting alone does not restore every setting.
+
+</Accordion>
+
+### Keep the settings after reboot
+
+These CPU and GPU settings reset at reboot. To reapply them at every boot, create
+`/etc/systemd/system/isaac-os-host-tuning.service`:
+
+```ini
+[Unit]
+Description=Apply Isaac OS CPU and GPU tuning
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/cpupower -c all frequency-set -g performance
+ExecStart=/usr/bin/cpupower -c all idle-set -D 1
+ExecStart=/usr/bin/nvidia-smi -i 0 -pm 1
+ExecStart=/bin/sh -c 'nvidia-smi -i 0 -lgc="$(nvidia-smi -i 0 --query-gpu=clocks.max.sm --format=csv,noheader,nounits)"'
+ExecStart=/bin/sh -c 'nvidia-smi -i 0 -lmc="$(nvidia-smi -i 0 --query-gpu=clocks.max.memory --format=csv,noheader,nounits)"'
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Adjust the paths with `command -v cpupower nvidia-smi` and remove any control your
+device does not support. Enable it, reboot, then repeat the inspection commands:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable isaac-os-host-tuning.service
+sudo reboot
+```
+
+To stop applying the settings at boot, run
+`sudo systemctl disable isaac-os-host-tuning.service`, then follow the restore steps.
+
+</Tab>
+</Tabs>
+
+## Run without a desktop
+
+Disabling the desktop frees memory and reduces background CPU/GPU work. On Jetson,
+CPU and GPU share memory, so reclaimed desktop RAM is available to either.
+Skip this step if your application needs a local display.
+Disable optional visualization before running applications without a display.
+For SO-101 sinus motion simulation, set `sim_so101.enable_camera: false` in
+`applications/so101_sinus_motion/sim/config/so101_sinus_motion_sim_config.yaml`.
+
+<Warning>
+These commands end graphical sessions. Save your work and run them from SSH or a
+text console. Check that you can reconnect before changing the boot default.
+</Warning>
+
+Record the current state:
+
+```bash
+systemctl get-default
+systemctl is-active display-manager.service
+```
+
+Stop the display manager for the current session:
+
+```bash
+sudo systemctl stop display-manager.service
+systemctl is-active display-manager.service
+```
+
+Expect `inactive`. To restore it, if it was running before:
+
+```bash
+sudo systemctl start display-manager.service
+```
+
+<Accordion title="Optional: boot without a desktop">
+
+Change the default for future boots, then reboot:
+
+```bash
+sudo systemctl set-default multi-user.target
+sudo reboot
+```
+
+To restore a previously graphical default:
+
+```bash
+sudo systemctl set-default graphical.target
+sudo systemctl start display-manager.service
+```
+
+If your recorded default was different, restore that target instead.
+
+</Accordion>
+
+<Accordion title="❓ How does this differ from multi-user.target?">
+
+`stop display-manager.service` stops the display manager and its graphical sessions.
+`systemctl isolate multi-user.target` also stops units outside that target's dependency
+set; it can affect more than the desktop. `set-default` changes the next boot, not the
+current session. See [systemctl][systemctl] for target behavior.
+
+</Accordion>
+
+## Check your configuration
+
+<Tabs>
+<Tab title="AGX Thor">
+
+<Info>
+Isaac OS reference benchmarks use the
+[AGX Thor reference configuration](/isaac-os/reference/platforms/system-configuration#agx-thor-reference-configuration).
+Apply it to compare with published results; other settings may suit your workload better.
+</Info>
+
+Inspect the host after your last reboot and just before benchmarking, from the
+checkout root:
+
+```bash
+sudo -v
+python3 tools/host_preflight.py
+```
+
+The checker is read-only and compares the host with the reference configuration.
+If you chose different settings, expect warnings for those differences.
+Applications still need their own thread placement and scheduling checks.
+
+Warnings (`!`) flag possible performance effects; information (`ℹ`) notes reference
+differences. Exit codes are `0` for clean or informational results, `1` for incomplete
+inspections (`✗`), and `2` for completed inspections with warnings. Add `--verbose`
+for individual checks and raw readings, or set `NO_COLOR=1` to disable terminal colors.
+
+Save a fresh report with each set of results:
+
+```bash
+python3 tools/host_preflight.py --format json > host-preflight.json
+```
+
+The report includes its UTC capture time, checker source hash, and reference revision.
+A match means the checked configuration agrees with the reference. Clock checks compare
+CPU, GPU, video, and memory readings with the selected mode's limits in `/etc/nvpmodel.conf`.
+Unlimited (`-1`) limits use the maximum supported frequency from sysfs. Mismatches warn;
+missing limits or readings fail inspection. Actual readings are retained for comparison.
+Boot requests such as
+`kthread_cpus` are labeled separately from observed CPU masks.
+Clock readings and placement are snapshots; the checker does not monitor throttling,
+all interrupt routing, or manually launched desktop processes throughout a run.
+
+</Tab>
+<Tab title="Linux x86_64">
+
+[`tools/host_preflight.py`](../../tools/host_preflight.py) does not assess x86_64 hosts yet. Repeat the inspection
+commands from each section above and record the results with your measurements.
+
+</Tab>
+</Tabs>
+
+[systemctl]: https://www.freedesktop.org/software/systemd/man/latest/systemctl.html
+[sdkm]: https://docs.nvidia.com/sdk-manager/install-with-sdkm-jetson/index.html
+[rt-kernel]: https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/Kernel/RealTimeKernel.html
+[thor-quickstart]: https://docs.nvidia.com/jetson/agx-thor-devkit/user-guide/latest/quick_start.html
+[thor-power]: https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/PlatformPowerAndPerformance/JetsonThor.html
+[nvidia-smi]: https://docs.nvidia.com/deploy/nvidia-smi/index.html
+[managed-irq]: https://docs.kernel.org/core-api/irq/managed_irq.html
+[grub-kernel-options]: https://ubuntu.com/real-time/docs/how-to/modify-kernel-boot-parameters/
+[daqiri-cpu-isolation]: https://www.holoscan.org/daqiri/tutorials/system_configuration/#step-5-isolate-cpu-cores

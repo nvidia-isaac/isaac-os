@@ -1,0 +1,74 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Managing model downloads
+
+<Note>
+Models for Isaac OS reference applications are downloaded automatically during
+their build to be available at runtime. This guide provides additional commands
+to share the resource cache across clones and worktrees, and to download an
+application's models before building it.
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Manage model downloads" hidePrompt actions={["cursor"]}>
+Find in our conversation and project if I need model downloads, a shared cache,
+or both. Ask me for missing details.
+Follow [Manage model downloads](/isaac-os/how-to/model-downloads). Check the cache
+paths. If you download models, verify that the required files are available.
+</Prompt>
+</llms-ignore>
+
+## Download models automatically during builds
+
+Replace `<app>` with your application name and build it normally to download and
+verify its required models:
+
+```bash
+./isaac_os build <app>
+```
+
+No separate download command is required. Subsequent builds reuse verified models
+from the resource cache.
+
+## Share the cache between worktrees
+
+Use the same cache mounts and environment for every download and build.
+For shared worktrees, reuse the existing host cache and export its mapping for every
+CLI invocation, for example (replace `<host-cache>` with the existing cache):
+
+```bash
+export ISAAC_OS_EXTRA_DOCKER_RUN_ARGS='-v <host-cache>:/cache/isaac-os -e CPM_SOURCE_CACHE=/cache/isaac-os/cpm -e ISAAC_RESOURCE_CACHE=/cache/isaac-os/resources'
+```
+
+## Warmup your model cache
+
+To download an application's models and resources before building it:
+
+```bash
+./isaac_os build <app> --target isaac_download_resources
+```
+
+For one model or resource, replace `<resource-target>` with its target name:
+
+```bash
+./isaac_os build <app> --target <resource-target>
+```
+
+<Accordion title="Example: GR00T N1.7 + WBC">
+
+Download all models for the GR00T N1.7 + WBC application:
+
+```bash
+./isaac_os build gr00t_n1_7_wbc_g1 --target isaac_download_resources
+```
+
+Download only its apple-to-plate model bundle:
+
+```bash
+./isaac_os build gr00t_n1_7_wbc_g1 --target gr00t_n1_7_g1_apple_to_plate_models
+```
+
+</Accordion>

@@ -1,0 +1,52 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+// Generic, shared FlatBuffers envelope for every tensor-schema type mcap_logger writes (see
+// common/mcap_logger/tensor_topic_poller.h). One root schema name
+// ("isaac.mcap_logger.TensorFrame") covers any T attached via
+// HsdkMcapLogger::attach<T>(..., contract, ...), not just holoscan::schema::ImageT -- the
+// type-specific fields (e.g. Image's width/height/encoding) live in `metadata`, a nested,
+// separately-schema'd FlatBuffers table identified by `metadata_schema_name`.
+namespace isaac.mcap_logger;
+
+enum TensorDType : ubyte {
+  UInt8,
+  Int8,
+  UInt16,
+  Int16,
+  UInt32,
+  Int32,
+  Float32,
+  Float64,
+}
+
+table TensorEntry {
+  shape: [uint32] (id: 0);
+  dtype: TensorDType (id: 1);
+  data: [uint8] (id: 2);
+}
+
+// metadata is already-serialized FlatBuffers bytes for the attached type's own metadata table
+// (e.g. holoscan.schema.Image); metadata_schema_name is that table's canonical name, so a reader
+// knows how to decode it without out-of-band knowledge of T. metadata_binary_schema is that same
+// table's compiled reflection schema (its .bfbs bytes, e.g. holoscan::schema::ImageBinarySchema)
+// -- carrying it here, not just the name, is what lets a reader that has never heard of T decode
+// `metadata` generically via FlatBuffers' own runtime reflection (flatbuffers/reflection.h on the
+// C++ side; the reader doesn't need to already link T's generated type at all, only decode
+// metadata_binary_schema itself via reflection_generated.h's Schema type). A reader that already
+// links T directly (e.g. this repo's own writer, or a future first-party replayer) can ignore
+// this field and decode `metadata` directly against the type it already knows.
+//
+// A generic decoder for the Foxglove side (tools/foxglove/isaac-to-foxglove-converter) that
+// consumes this field instead of the hand-written, ImageT-specific
+// decodeHoloscanSchemaImageMetadata() is planned for a future MR -- see that function's own
+// comment.
+table TensorFrame {
+  tensors: [TensorEntry] (id: 0);
+  metadata: [uint8] (id: 1);
+  metadata_schema_name: string (id: 2);
+  metadata_binary_schema: [uint8] (id: 3);
+}
+
+root_type TensorFrame;
+file_identifier "ISTF";

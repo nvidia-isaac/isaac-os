@@ -1,0 +1,4 @@
+# Ignore everything by default, then allowlist what the docs image build needs.
+*
+
+!/Dockerfile

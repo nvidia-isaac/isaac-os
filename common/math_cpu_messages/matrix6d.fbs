@@ -1,0 +1,20 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+native_include "Eigen/Dense";
+native_include "common/math_cpu_messages/matrix6d_adapter.h";
+
+namespace isaac;
+
+// Row-major 6x6 double-precision matrix, native_type-backed by
+// Eigen::Matrix<double, 6, 6, Eigen::RowMajor> -- explicitly row-major (Eigen defaults to
+// column-major) so its in-memory layout matches the wire layout exactly, letting Pack/UnPack
+// reinterpret the buffer directly (Eigen::Map) instead of copying element-by-element. No
+// fixed-size 6x6 type exists anywhere in the Holoscan SDK's own schemas; this covers that shape
+// (e.g. a pose/twist covariance matrix) and is reusable wherever else it shows up.
+struct Matrix6d (
+  native_type: "Eigen::Matrix<double, 6, 6, Eigen::RowMajor>",
+  native_default: "Eigen::Matrix<double, 6, 6, Eigen::RowMajor>::Zero()"
+) {
+  m: [double:36];
+}

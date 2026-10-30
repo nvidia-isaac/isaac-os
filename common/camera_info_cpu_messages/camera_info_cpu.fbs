@@ -1,0 +1,43 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+include "geometry.fbs";
+include "header.fbs";
+include "matrix3x4d.fbs";
+
+namespace isaac;
+
+// Calibrated camera intrinsics, extrinsics, and distortion, using CPU-resident double arrays --
+// mirrors sensor_msgs/CameraInfo.
+table CameraInfoCpu {
+  header: holoscan.schema.Header (id: 0);
+  height: uint32 (id: 1);
+  width: uint32 (id: 2);
+
+  // Name of the distortion model in use, e.g. "plumb_bob" or "rational_polynomial".
+  distortion_model: string (id: 3);
+
+  // Distortion coefficients, in the order the distortion_model above defines. Variable length
+  // because different distortion models use different coefficient counts.
+  d: [double] (id: 4);
+
+  // Intrinsic camera matrix.
+  k: holoscan.schema.Matrix3d (id: 5, required, native_inline);
+
+  // Rectification matrix.
+  r: holoscan.schema.Matrix3d (id: 6, required, native_inline);
+
+  // Projection matrix.
+  p: isaac.Matrix3x4d (id: 7, required, native_inline);
+
+  binning_x: uint32 (id: 8);
+  binning_y: uint32 (id: 9);
+  roi_x_offset: uint32 (id: 10);
+  roi_y_offset: uint32 (id: 11);
+  roi_height: uint32 (id: 12);
+  roi_width: uint32 (id: 13);
+  roi_do_rectify: bool (id: 14);
+}
+
+root_type CameraInfoCpu;
+file_identifier "ISCI";

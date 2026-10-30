@@ -1,0 +1,55 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "default",
+    "description": "Visual SLAM on a VB1940 stereo camera rig captured through SIPL.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0.1"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "default": {
+        "description": "Track the camera rig and show every camera in a window.",
+        "run": {
+          "command": "<isaac_app_bin>/cuvslam_vb1940 --application-config-path=<isaac_app_source>/config/config.yaml --json-config=common/sipl/config/vb1940_stereo.json",
+          "workdir": "isaac_root"
+        }
+      },
+      "headless": {
+        "description": "Track the camera rig without opening a window, for a machine with no display attached.",
+        "run": {
+          "command": "<isaac_app_bin>/cuvslam_vb1940 --application-config-path=<isaac_app_source>/config/config.yaml --json-config=common/sipl/config/vb1940_stereo.json --headless",
+          "workdir": "isaac_root"
+        }
+      },
+      "validate": {
+        "description": "Build and check the pipeline, then exit without capturing.",
+        "run": {
+          "command": "<isaac_app_bin>/cuvslam_vb1940 --application-config-path=<isaac_app_source>/config/config.yaml --json-config=common/sipl/config/vb1940_stereo.json --validate",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "cuvslam_vb1940",
+    "platforms": [
+      "aarch64"
+    ],
+    "ranking": 1,
+    "requirements": {},
+    "tags": [
+      "robotics",
+      "slam",
+      "camera"
+    ],
+    "version": "0.1.0"
+  }
+}

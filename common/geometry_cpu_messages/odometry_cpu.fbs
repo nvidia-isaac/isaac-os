@@ -1,0 +1,36 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+include "header.fbs";
+include "matrix6d.fbs";
+include "pose_cpu.fbs";
+include "twist_cpu.fbs";
+
+namespace isaac;
+
+// Estimated pose and velocity of a robot in free space, with covariances -- mirrors
+// nav_msgs/Odometry. pose/twist are the plain (unstamped) shape: this table's own header
+// carries the timestamp and frame, so PoseCpu.header/TwistCpu.header are left unset by
+// producers of this table.
+table OdometryCpu {
+  header: holoscan.schema.Header (id: 0);
+
+  // Name of the child coordinate frame the twist is expressed in, mirroring
+  // nav_msgs/Odometry.child_frame_id.
+  child_frame_id: string (id: 1);
+
+  pose: isaac.PoseCpu (id: 2, required);
+
+  // Covariance of pose (x, y, z, rotation about X, Y, Z), mirroring
+  // nav_msgs/Odometry.pose.covariance.
+  pose_covariance: isaac.Matrix6d (id: 3, required, native_inline);
+
+  twist: isaac.TwistCpu (id: 4, required);
+
+  // Covariance of twist (x, y, z, rotation about X, Y, Z), mirroring
+  // nav_msgs/Odometry.twist.covariance.
+  twist_covariance: isaac.Matrix6d (id: 5, required, native_inline);
+}
+
+root_type OdometryCpu;
+file_identifier "ISOD";

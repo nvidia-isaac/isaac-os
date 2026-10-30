@@ -1,0 +1,34 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+include "tensor.fbs";
+include "isaac_header.fbs";
+
+namespace isaac;
+
+// Describes the state of a set of torque-controlled joints.
+table JointState {
+
+  // Header
+  header: Header (id: 0);
+
+  // Names of the joints.
+  name: [string] (id: 1);
+
+  // Position of each joint (radians or meters).
+  position: holoscan.schema.Tensor (id: 2);
+
+  // Velocity of each joint (radians/second or meters/second).
+  velocity: holoscan.schema.Tensor (id: 3);
+
+  // Acceleration of each joint (radians/second^2 or meters/second^2).
+  acceleration: holoscan.schema.Tensor (id: 4);
+
+  // Actuator effort applied in each joint (Newton meters or Newtons).
+  effort: holoscan.schema.Tensor (id: 5);
+
+  // Temperature of each joint (Celsius).
+  temperature: holoscan.schema.Tensor (id: 6);
+}
+
+root_type JointState;

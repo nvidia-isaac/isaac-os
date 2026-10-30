@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# The application's fixed SO-101 reach-policy contract.
+#
+# observation: float32 [1, 20]
+#   joint_pos_rel(6) | ee_position(3) | goal_pose(7) | last_action(4)
+# actions: float32 [1, 4]
+policy:
+  onnx_path: "data/grip_reach_delta_policy_onnx/policy_fingertip_delta.onnx"
+  inference_period: 0.02
+  action_clip: 1.0
+  default_joint_position: [0.0, 0.0, 0.0, 1.5700000524520874, 0.0, 0.0]
+  # Walk the 1x3x3 grid in Z/Y/X order,
+  # advancing after the fingertip reaches a goal or the 10-second hold expires.
+  goal_pos_x_range: [0.20, 0.20]
+  goal_pos_y_range: [-0.112, 0.112]
+  goal_pos_z_range: [0.136, 0.264]
+  goal_grid_nx: 1
+  goal_grid_ny: 3
+  goal_grid_nz: 3
+  goal_hold_time: 10.0
+  goal_settle_time: 1.0
+  reach_threshold: 0.05
+
+# In mock and real modes, the state source and controller run at 100 Hz; the policy
+# above runs at 50 Hz.
+state_source:
+  period: 0.01
+
+motion_control:
+  action_scale: 0.2
+  action_max_step_size: 0.1
+  motion_max_step_size: 0.05
+  target_expiry: 0.04
+  # wrist_roll stays at zero; gripper zero is its calibrated closed endpoint.
+  fixed_joint_positions: [0.0, 0.0]
+  joint_pos_limits_lower:
+    - -1.9198598861694336
+    - -1.7453298568725586
+    - -1.6899999380111694
+    - -1.65805983543396
+  joint_pos_limits_upper:
+    - 1.9198598861694336
+    - 1.7453298568725586
+    - 1.6899999380111694
+    - 1.65805983543396
+
+real_robot:
+  serial_port: "/dev/ttyACM0"
+  calibration_file: "PLACEHOLDER_PATH_TO_FOLLOWER_CALIBRATION_FILE.json"
+  run_speed: 1500
+  run_acceleration: 60
+  position_p_gain: 16
+  position_i_gain: 16
+  position_d_gain: 32
+  home_position: [0.0, 0.0, 0.0, 1.5708, 0.0, 0.0]
+
+# Isaac Sim UCX connection. The simulator launcher must use the same port.
+sim_so101:
+  hostname: "127.0.0.1"
+  port: 50008

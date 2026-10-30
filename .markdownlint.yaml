@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# line-length:
+MD013:
+  line_length: 100
+  heading_line_length: 100
+  code_blocks: false
+  tables: false
+# no-duplicate-heading:
+MD024:
+  siblings_only: true
+# ol-prefix:
+MD029:
+  style: ordered
+# Details render in both views; Fern tabs fall back to stacked README sections.
+MD033:
+  allowed_elements: [details, summary, Tabs, Tab, Info, Note, Warning, Accordion, div]
+# descriptive-link-text:
+MD059: false

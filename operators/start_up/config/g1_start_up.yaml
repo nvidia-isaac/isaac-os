@@ -1,0 +1,91 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Stable start-up routine for the Unitree G1 (StartUpOp). Loaded via the `config_file` path in
+# the application's `start_up` block; sdk_joint_order and auto_enable_delay are set there (shared
+# anchor and per-deployment tunable respectively) so they are not repeated here. Gains/positions
+# are regex -> value maps over sdk_joint_order (most specific match wins). Hands get a light kp so
+# they hold 0.0 and settle (else the free-floating hand DOFs can veto the settle check).
+
+control_dt: 0.02 # 50 Hz pipeline; the durations below convert to steps
+
+# PD gains while ramping through the setup waypoints (kept gentle so motions are slow, non-jerky).
+kp:
+  '.*': 100.0
+  'left_hand_.*': 1.0 # light hold so hands settle at 0.0 (tune down if they buzz)
+  'right_hand_.*': 1.0
+kd:
+  '.*': 2.0
+  'left_hand_.*': 0.1
+  'right_hand_.*': 0.1
+
+# Stiffer PD gains once the final pose is reached, so the robot holds a rigid stance off-tether
+# until the WBC engages. The legs are the inverted-pendulum springs, so ankle/knee/hip get the
+# highest stiffness. Bench-tuning starting points: lower to the smallest values that hold firmly
+# without vibration.
+hold_kp:
+  '.*': 100.0
+  '.*_hip_.*': 350.0
+  '.*_knee_joint': 300.0
+  '.*_ankle_.*': 450.0
+  'left_hand_.*': 1.0 # hold hands at 0.0 through the final hold
+  'right_hand_.*': 1.0
+hold_kd:
+  '.*': 2.0
+  '.*_hip_.*': 10.0
+  '.*_knee_joint': 10.0
+  '.*_ankle_.*': 10.0
+  'left_hand_.*': 0.1
+  'right_hand_.*': 0.1
+
+dwell_duration: 0.5 # min hold at each waypoint before the velocity-settled check
+vel_settled_threshold: 0.5 # max joint velocity (rad/s) that counts as settled
+
+# Each waypoint is held until joint velocities settle. The sequence moves the arms through
+# wide-clearance intermediate poses before arriving at the WBC-ready standing configuration.
+waypoints:
+  # Step 1: Raise both arms out to the side fully extended (~85 deg) for max torso clearance.
+  - name: arms_lateral
+    duration: 2.0
+    joint_positions:
+      '.*': 0.0
+      '.*_hip_pitch_joint': -0.1
+      '.*_knee_joint': 0.3
+      '.*_ankle_pitch_joint': -0.2
+      'left_elbow_joint': 1.5
+      'right_elbow_joint': 1.5
+      'left_shoulder_roll_joint': 1.5 # ~85 deg lateral raise; limit +2.2515
+      'right_shoulder_roll_joint': -1.5 # ~85 deg lateral raise; limit -2.2515
+
+  # Step 2: Straighten the elbows while the arms stay raised to the sides.
+  - name: bend_elbows
+    duration: 1.5
+    joint_positions:
+      '.*': 0.0
+      '.*_hip_pitch_joint': -0.1
+      '.*_knee_joint': 0.3
+      '.*_ankle_pitch_joint': -0.2
+      'left_shoulder_roll_joint': 1.5
+      'right_shoulder_roll_joint': -1.5
+
+  # Step 3: Lower the arms to the sides and settle into the solved stable standing pose.
+  - name: start_up
+    duration: 2.0
+    joint_positions:
+      '.*': 0.0
+      '.*_hip_pitch_joint': -0.2408
+      '.*_knee_joint': 0.6235
+      '.*_ankle_pitch_joint': -0.3107
+      'left_shoulder_roll_joint': 0.1
+      'right_shoulder_roll_joint': -0.1
+      '.*_shoulder_pitch_.*': -0.15
+
+      '.*_elbow_.*': 0.150
+      '.*_wrist_roll_.*': -0.1
+      '.*_wrist_pitch_.*': -0.4
+
+      'left_shoulder_yaw_joint': 0.85
+      'right_shoulder_yaw_joint': -0.85
+
+      'left_wrist_yaw_joint': -0.15
+      'right_wrist_yaw_joint': 0.15

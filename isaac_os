@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# ==============================================================================
+# Isaac OS CLI wrapper
+# ==============================================================================
+#
+# Delegates to the standalone holoscan-cli package
+# (https://github.com/nvidia-holoscan/holoscan-cli) with Isaac OS project
+# defaults. Hosts run the locked package through uv; the Docker image installs
+# the same locked requirement at build time.
+#
+# REQUIREMENTS:
+#   - uv, Git, and internet access on the first host invocation
+#
+# ENVIRONMENT VARIABLES:
+#
+#   Build configuration:
+#     ISAAC_OS_EXTRA_DOCKER_BUILD_ARGS   Extra args for docker build
+#     ISAAC_OS_EXTRA_DOCKER_RUN_ARGS     Extra args for docker run
+#     ISAAC_USE_SCCACHE                  "ON" (default) or "OFF"
+#     SCCACHE_MEMCACHED_ENDPOINT         Optional memcached endpoint (host:port)
+#
+#   CMake overrides (auto-detected, override via --configure-args):
+#     ISAAC_ENABLE_NV_VIDEO_SDK
+#
+# EXAMPLES:
+#   ./isaac_os --help                               # Show available commands
+#   ./isaac_os run so101_sinus_motion mock    # Run an application mode.
+#   ./isaac_os modes so101_sinus_motion       # List application modes.
+#   ./isaac_os run so101_sinus_motion mock --parallel 4
+#   ./isaac_os run so101_sinus_motion mock -- --message-count=10
+#   ./isaac_os build-container                      # Build container from the default Dockerfile.
+#   ./isaac_os run-container                        # Run container /bin/bash.
+#   ./isaac_os clear-cache                          # Clear the cmake cache.
+#   ./isaac_os env-info                             # List environment variables.
+#   ./isaac_os list                                 # List available apps.
+#   ./isaac_os test                                 # Run ctest (default headless).
+#   ./isaac_os test so101_sinus_motion --no-xvfb
+# ==============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd -P)"
+export HOLOSCAN_CLI_CMD_NAME="${BASH_SOURCE[0]}"
+export HOLOSCAN_CLI_ROOT="${SCRIPT_DIR}"
+
+# ==============================================================================
+# Isaac OS project identity (consumed by holoscan-cli)
+# ==============================================================================
+
+export HOLOSCAN_CLI_REPO_PREFIX="${HOLOSCAN_CLI_REPO_PREFIX:-isaac_os_build}"
+export HOLOSCAN_CLI_WORKSPACE_NAME="${HOLOSCAN_CLI_WORKSPACE_NAME:-isaac_os}"
+# Braces in the default must not nest inside ${VAR:-...}; bash would end the
+# expansion at the first `}` and mangle the template.
+image_format_default='{container_prefix}:latest'
+export HOLOSCAN_CLI_DEFAULT_IMAGE_FORMAT="${HOLOSCAN_CLI_DEFAULT_IMAGE_FORMAT:-${image_format_default}}"
+export HOLOSCAN_CLI_PATH_PREFIX="${HOLOSCAN_CLI_PATH_PREFIX:-isaac}"
+export HOLOSCAN_CLI_SEARCH_PATH="${HOLOSCAN_CLI_SEARCH_PATH:-tutorials,benchmarks,subgraphs,applications,operators}"
+export HOLOSCAN_CLI_BUILD_PARENT_DIR="${HOLOSCAN_CLI_BUILD_PARENT_DIR:-${HOLOSCAN_CLI_ROOT}/build}"
+export HOLOSCAN_CLI_CTEST_SCRIPT="${HOLOSCAN_CLI_CTEST_SCRIPT:-cmake/isaac_os.container.ctest}"
+# Keep this aligned with the project Dockerfile; the CLI uses the SDK version
+# to select CUDA.
+export HOLOSCAN_CLI_BASE_SDK_VERSION="${HOLOSCAN_CLI_BASE_SDK_VERSION:-5.0.0}"
+export HOLOSCAN_CLI_IN_CONTAINER_CMD="${HOLOSCAN_CLI_IN_CONTAINER_CMD:-./${BASH_SOURCE[0]##*/}}"
+
+# ==============================================================================
+# Docker build args
+# ==============================================================================
+
+# Docker build arguments for the development container:
+#   --build-arg BUILDKIT_INLINE_CACHE  Disabled by default for local dev (CI overrides to 1)
+#   ISAAC_OS_EXTRA_DOCKER_BUILD_ARGS   Extra args from environment (e.g. CI cache flags)
+docker_build_args="--build-arg BUILDKIT_INLINE_CACHE=0"
+docker_build_args+=" ${ISAAC_OS_EXTRA_DOCKER_BUILD_ARGS:-}"
+
+export HOLOSCAN_CLI_DEFAULT_DOCKER_BUILD_ARGS="${docker_build_args# }"
+
+# ==============================================================================
+# Docker run args
+# ==============================================================================
+
+# Docker run arguments for the development container:
+#   --privileged                    Full device access (required for GPU, sensors, DinD)
+#   --cap-add=CAP_SYS_NICE          Set process priorities and scheduling policies
+#   --ulimit rtprio=10              Real-time process scheduling with priority level 10
+#   --pid=host                      Share host PID namespace for interprocess communication
+#   --ipc=host                      Share host IPC namespace for UCX shared memory transport
+#   --cap-add=CAP_SYS_PTRACE        Process tracing for shared memory operations
+#   --group-add <gid>               Input device group access
+
+#   ISAAC_OS_EXTRA_DOCKER_RUN_ARGS  Extra args from environment
+run_args="--privileged --cap-add=CAP_SYS_NICE --ulimit rtprio=10"
+run_args+=" --pid=host --ipc=host --cap-add=CAP_SYS_PTRACE"
+
+# Add input group for device access.
+if getent group input >/dev/null 2>&1; then
+    run_args+=" --group-add $(getent group input | cut -d: -f3)"
+fi
+
+[[ -n "${IS_CI_BUILD:-}" ]] && run_args+=" -e IS_CI_BUILD=$IS_CI_BUILD"
+
+
+
+run_args+=" ${ISAAC_OS_EXTRA_DOCKER_RUN_ARGS:-}"
+
+export HOLOSCAN_CLI_DEFAULT_DOCKER_RUN_ARGS="${run_args# }"
+
+# ==============================================================================
+# sccache
+# ==============================================================================
+
+ISAAC_USE_SCCACHE="${ISAAC_USE_SCCACHE:-ON}"
+
+if [[ "$ISAAC_USE_SCCACHE" == "ON" ]] && [[ -n "${SCCACHE_MEMCACHED_ENDPOINT:-}" ]]; then
+    host="${SCCACHE_MEMCACHED_ENDPOINT%:*}"
+    port="${SCCACHE_MEMCACHED_ENDPOINT##*:}"
+    if timeout 5 bash -c "echo -n > /dev/tcp/${host}/${port}" 2>/dev/null; then
+        echo " > Using memcached endpoint $SCCACHE_MEMCACHED_ENDPOINT"
+    else
+        echo " > Warning: Memcached endpoint $SCCACHE_MEMCACHED_ENDPOINT not reachable, falling back to local caching."
+    fi
+fi
+
+export HOLOSCAN_CLI_ENABLE_SCCACHE=${ISAAC_USE_SCCACHE}
+
+# ==============================================================================
+# Application argument forwarding
+# ==============================================================================
+#
+# Pass application arguments directly after a bare `--` instead of packing them
+# into `--run-args`:
+#
+#   ./isaac_os run so101_sinus_motion mock -- --message-count=100
+#
+# Everything after the first bare `--` is quoted into a single `--run-args=...`
+# value; holoscan-cli shlex-splits it back apart and appends it to the
+# application command line, including when re-entering the container. Only the
+# `run` subcommand is rewritten -- holoscan-cli already claims `--` on
+# `run-container` for forwarding docker arguments.
+#
+# `--run-args` keeps working; it is just no longer required.
+
+# POSIX single-quote each argument so that holoscan-cli's shlex.split() gives
+# back the exact tokens. bash's `printf %q` is unsuitable here: it emits
+# $'...' ANSI-C quoting for control characters, which shlex does not parse.
+quote_for_run_args() {
+    local IFS=' ' quoted=() arg escaped
+    for arg in "$@"; do
+        escaped=${arg//\'/\'\\\'\'}
+        quoted+=("'$escaped'")
+    done
+    printf '%s' "${quoted[*]}"
+}
+
+if [[ "${1:-}" == "run" ]]; then
+    cli_args=()
+    app_args=()
+    saw_separator=0
+    for arg in "$@"; do
+        if [[ "$saw_separator" -eq 0 && "$arg" == "--" ]]; then
+            saw_separator=1
+        elif [[ "$saw_separator" -eq 1 ]]; then
+            app_args+=("$arg")
+        else
+            cli_args+=("$arg")
+        fi
+    done
+
+    if [[ "$saw_separator" -eq 1 ]]; then
+        for arg in "${cli_args[@]}"; do
+            if [[ "$arg" == "--run-args" || "$arg" == "--run-args="* ]]; then
+                echo "[isaac_os] Pass application arguments with either --run-args or a" \
+                     "trailing '--', not both." >&2
+                exit 1
+            fi
+        done
+        set -- "${cli_args[@]}"
+        if [[ "${#app_args[@]}" -gt 0 ]]; then
+            set -- "$@" "--run-args=$(quote_for_run_args "${app_args[@]}")"
+        fi
+    fi
+fi
+
+# ==============================================================================
+# holoscan-cli bootstrap
+# ==============================================================================
+
+CLI_REQUIREMENT="$(sed -nE 's/^[[:space:]]*"(holoscan-cli[^"]*)",?[[:space:]]*$/\1/p' "${SCRIPT_DIR}/pyproject.toml")"
+if [[ -z "${CLI_REQUIREMENT}" ]]; then
+    echo "[isaac_os] Could not find a holoscan-cli dependency in ${SCRIPT_DIR}/pyproject.toml." >&2
+    exit 1
+fi
+CLI_PIN="${CLI_REQUIREMENT#holoscan-cli==}"
+CLI_PIN="${CLI_PIN##*@}"
+UV_BIN="$(command -v uv || true)"
+
+if [[ "${ISAAC_OS_CONTAINER:-}" == "1" || -z "${UV_BIN}" ]]; then
+    INSTALLED_PIN="$(python3 - "${CLI_REQUIREMENT}" 2>/dev/null <<'PY' || true
+import json
+import sys
+from importlib.metadata import distribution
+
+dist = distribution("holoscan-cli")
+if "git+" in sys.argv[1]:
+    source = json.loads(dist.read_text("direct_url.json") or "{}")
+    print(source.get("vcs_info", {}).get("commit_id", dist.version))
+else:
+    print(dist.version)
+PY
+)"
+    if [[ "${INSTALLED_PIN}" == "${CLI_PIN}" ]]; then
+        exec python3 -u -m holoscan_cli "$@"
+    elif [[ "${ISAAC_OS_CONTAINER:-}" == "1" ]]; then
+        echo "[isaac_os] This container has holoscan-cli ${INSTALLED_PIN:-not installed};" \
+             "expected ${CLI_PIN}. Rebuild the image." >&2
+        exit 1
+    fi
+fi
+
+if [[ -z "${UV_BIN}" ]]; then
+    echo "[isaac_os] uv is required. Install uv: https://docs.astral.sh/uv/" >&2
+    exit 1
+fi
+exec env -u PYTHONPATH "${UV_BIN}" run --frozen --project "${SCRIPT_DIR}" holoscan-cli "$@"

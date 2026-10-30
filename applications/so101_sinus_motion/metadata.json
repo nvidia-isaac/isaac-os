@@ -1,0 +1,62 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "mock",
+    "description": "SO101 sinusoidal joint motion with mock, real-arm, and Isaac Sim (UCX) modes.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0.1"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "mock": {
+        "description": "Run the 100 Hz mock arm with sine-wave joint commands.",
+        "run": {
+          "command": "<isaac_app_bin>/mock/mock_so101_sinus_motion",
+          "workdir": "isaac_root"
+        }
+      },
+      "profile_real": {
+        "description": "Measure servo speed and acceleration with bounded shoulder-pan steps and CSV feedback.",
+        "run": {
+          "command": "<isaac_app_bin>/real/so101_motion_profile",
+          "workdir": "isaac_root"
+        }
+      },
+      "real": {
+        "description": "Run sinusoidal joint motion on the SO101 Feetech arm.",
+        "run": {
+          "command": "<isaac_app_bin>/real/so101_sinus_motion_real",
+          "workdir": "isaac_root"
+        }
+      },
+      "sim": {
+        "description": "Run sinusoidal joint motion against Isaac Sim over UCX; shows the simulator camera in a Holoviz window when enable_camera is set in the YAML.",
+        "run": {
+          "command": "<isaac_app_bin>/sim/so101_sinus_motion_sim --config-path=<isaac_app_source>/sim/config/so101_sinus_motion_sim_config.yaml",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "so101_sinus_motion",
+    "platforms": [
+      "x86_64",
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "tags": [
+      "robotics",
+      "testing"
+    ],
+    "version": "0.1.0"
+  }
+}

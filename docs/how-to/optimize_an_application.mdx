@@ -1,0 +1,380 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Optimize an Application
+
+<Note>
+Improve application performance and make critical workloads more predictable with
+Holoscan SDK. Use profiling to identify bottlenecks, partition CPU and GPU resources,
+and reduce delays from memory allocation, synchronization, and data dependencies.
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Optimize an application" hidePrompt actions={["cursor"]}>
+Find the target application, its critical workloads and the performance goal in
+our conversation and project. Ask me for missing details.
+Follow the [optimization guide](/isaac-os/how-to/optimize-an-application) and
+the [optimization skill](../../skills/optimize-application/SKILL.md) to find
+bottlenecks and reduce latency and jitter. Keep output rates, data freshness and
+correctness. Compare the results before and after.
+</Prompt>
+</llms-ignore>
+
+## Optimize the host
+
+Ensure that your host has been configured for optimal performance. Work through
+the instructions for your platform in
+[Optimize your host](/isaac-os/how-to/optimize-your-host).
+
+## Profile your application
+
+Start by identifying where your application spends time and which paths miss
+their latency budgets. [Profile an Application](/isaac-os/how-to/profile-an-application)
+shows how to measure source-to-sink latency and message rates, including tail
+latency and budget exceedances on critical paths.
+
+To investigate delays around GPU work, capture additional CUDA detail with
+[Nsight Systems](https://developer.nvidia.com/nsight-systems). Pass
+`--trace=cuda,nvtx,osrt` through the run command's `--nsys-args` to see kernel launches,
+transfers, synchronization, and thread waits. If the delay occurs before a CPU
+thread runs, add CPU sampling or context-switch tracing.
+
+Use the [Nsight diagnostic queries](../../tools/profiling/nsight_queries.md) to
+inspect CUDA API calls, synchronization and kernel activity in a SQLite export.
+
+## Identify areas of improvement
+
+The following sections address resource sharing, processing costs, recurring execution
+overhead, and dependencies between workloads. Use your profiling results to choose where
+to start:
+
+| What needs improvement | Relevant guidance |
+| --- | --- |
+| Critical workloads slow down when other workloads run | [Partition CPU and GPU resources](#partition-cpu-and-gpu-resources) to control placement and resource allocation. For GPU interference that remains, [investigate work-queue contention](#investigate-cuda-work-queue-contention) and [bound outstanding GPU work](#bound-work-submitted-ahead-of-gpu-completion). |
+| Image, tensor, or other processing takes a substantial share of execution time | [Accelerate processing stages](#accelerate-processing-stages) using an implementation suited to the operations and data layout. |
+| Memory management or synchronization adds delays during execution | [Reuse allocated memory](#eliminate-cuda-allocations-from-steady-state-execution) and [remove unintended synchronization](#remove-unintended-synchronization). |
+| Launching or scheduling many small operations takes a substantial share of execution time | [Use CUDA Graphs](#use-cuda-graphs-to-reduce-launch-overhead) or [group small sequential operations](#group-small-sequential-operations). |
+| A critical workload waits for a slower producer or processes stale inputs | Review the [architectural patterns for different-rate workloads](#architectural-patterns-for-different-rate-workloads), including publishing completed results and selecting the latest usable input. |
+
+## Partition CPU and GPU resources
+
+To isolate critical workloads from competing work, place them in separate Holoscan
+[execution partitions][hsdk-partitions]. Operators within a partition share a
+serial execution thread, while different partitions can run concurrently. Through
+[deployment bindings][hsdk-placement], each partition can have CPU placement,
+scheduling policies, and GPU SM allocations suited to its workload.
+
+### Isolate CPU execution
+
+To keep competing work from delaying critical callbacks, combine two layers of
+CPU isolation:
+
+- **CPU affinity controls where a partition runs.** Assign critical workloads CPU
+  sets separate from competing work. Combine affinity with the
+  [host CPU isolation settings](/isaac-os/how-to/optimize-your-host#reduce-scheduling-interference)
+  to move background work and interrupts away from those CPUs; affinity alone
+  does not reserve those CPUs exclusively.
+- **Scheduling policy and priority control which runnable thread runs first.**
+  `SCHED_FIFO` and `SCHED_RR` give real-time threads precedence over ordinary
+  `SCHED_OTHER` work. Both use priorities from 1 to 99, with larger values taking
+  precedence. FIFO runs until it blocks, yields, or is preempted by higher-priority
+  work; round-robin also time-slices threads at the same priority.
+
+For the most responsive enforcement of Linux real-time scheduling priorities,
+use a [PREEMPT_RT kernel][linux-preempt-rt]. It makes most kernel work preemptible,
+moves most interrupt handling into schedulable threads, and uses priority
+inheritance for kernel locks, allowing a ready, high-priority thread to
+run sooner. Standard kernels support the same scheduling policies, but
+non-preemptible kernel work can delay their effect. On AGX Thor, follow the
+[host guide](/isaac-os/how-to/optimize-your-host#jetpack-rt-kernel) to install and
+select the real-time kernel.
+
+To give a critical workload its own CPU affinity and scheduling priority, create
+a named partition and bind its thread placement before compiling the graph.
+For example, to isolate a critical control workload from inference, pin control
+to CPU 8 with FIFO priority 40 and inference to CPU 9 with the default policy.
+The example assumes `controller` and `inference` are operator handles already
+created in the graph; `auto_partition_remaining()` partitions any other operators:
+
+```cpp
+graph.partition("control").add(controller);
+graph.partition("inference").add(inference);
+graph.auto_partition_remaining();
+
+holoscan::CompileOptions options;
+options.deployment
+    .bind_thread_placement(
+        "control",
+        holoscan::ThreadPlacement{
+            .affinity = holoscan::CPUAffinity{{8}},
+            .scheduling = {.policy = holoscan::SchedulingPolicy::kFIFO,
+                           .priority = 40},
+            .probe_failure_policy = holoscan::ProbeFailurePolicy::kFailAdmission})
+    .bind_thread_placement(
+        "inference",
+        holoscan::ThreadPlacement{.affinity = holoscan::CPUAffinity{{9}},
+                                 .probe_failure_policy =
+                                     holoscan::ProbeFailurePolicy::kFailAdmission});
+```
+
+Choose CPU IDs from the sets available to your container, leaving CPUs for OS and
+runtime support work. To place the runtime controller or Channel pump separately,
+use `bind_support_thread_affinity()`. If workloads share CPUs, keep continuously
+runnable background work below critical workloads' FIFO priorities to avoid
+starving them.
+
+To select a different scheduling policy, use Holoscan's `kOther`, `kFIFO`,
+`kRoundRobin`, or `kDeadline`, corresponding to the Linux policies above and
+`SCHED_DEADLINE`. Deadline scheduling takes runtime, deadline, and period budgets
+in nanoseconds instead of a fixed priority.
+
+These placement requests require permission from the host and container. The
+example uses `kFailAdmission` to reject requests whose placement cannot be proven;
+check `plan.ok()` and its diagnostics for admission failures. Once running,
+inspect the threads with `ps -L -p <pid> -o tid,cls,rtprio,psr,comm`, then check
+their effective affinity and policy with `taskset -pc <tid>` and `chrt -p <tid>`.
+For a complete application configuration, see
+[GR00T/WBC CPU placement](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#gpu-and-cpu-placement).
+
+### Isolate GPU work with CUDA Green Contexts
+
+Separate CPU threads can still compete for the same GPU streaming
+multiprocessors (SMs). To keep other GPU work from occupying all available SMs,
+use Holoscan's [CUDA Green Context placement][hsdk-green] to reserve subsets for
+critical workloads.
+
+Continuing the control-and-inference example, reserve SMs for the critical control
+partition as follows:
+
+1. Find a supported allocation size by querying the deployment GPU with
+   `holoscan::query_cuda_green_context_capability(holoscan::DeviceId{0})` and check
+   the result. Choose a positive multiple of `structured_sm_quantum`, within the
+   reported structured capacity, leaving capacity for other CUDA work.
+2. Assign that allocation to the named `control` partition before compilation.
+   Here `control_sms` is the selected count, and `options` is the same
+   `CompileOptions` used for CPU placement:
+
+   ```cpp
+   options.deployment.bind_cuda_green_context(
+       "control", holoscan::CudaGreenContextPlacement{
+                      .device = holoscan::DeviceId{0},
+                      .sm_count = control_sms});
+   ```
+
+3. Compile with those options and check the plan's diagnostics,
+   `cuda_green_context_requests()`, and `cuda_green_context_assignments()`.
+   The capability query does not reserve resources; runtime startup also validates
+   the actual device and creates the contexts and streams.
+4. Submit operator CUDA work on `context.cuda_stream().get()`. Configure external
+   libraries to use that stream too. Work launched on an unrelated library or
+   default stream is outside this placement contract.
+
+In this example, the critical control workload uses its reserved SMs, and other
+Holoscan CUDA work in the same process on that device uses a residual Green Context.
+Holoscan SDK currently
+requires one Green-Context-owning runtime process per physical GPU; it does not
+coordinate SM reservations with unrelated CUDA applications.
+
+Workloads still share memory bandwidth, caches, copy engines, and other GPU
+scheduling resources. If a critical workload stalls while its SMs are idle,
+investigate allocations, synchronization, and queued GPU work in the following sections.
+For an application using both CPU and GPU placement, see the
+[GR00T/WBC placement example](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#gpu-and-cpu-placement)
+and its [measured results](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1/benchmark#results).
+
+## Accelerate processing stages
+
+Use CPU and GPU profiles to identify processing steps whose computation or
+intermediate memory traffic adds latency or jitter, such as image conversion,
+tensor indexing, or filtering.
+
+Consider existing operators and optimized libraries suited to the workload.
+For regular tensor operations, [MatX](https://nvidia.github.io/MatX/) provides GPU
+implementations of element-wise arithmetic, type conversion, permutation, and
+indexed gather/scatter in C++. Its [expression fusion](https://nvidia.github.io/MatX/basics/fusion.html)
+combines compatible element-wise operations within one expression into a kernel
+without intermediate tensors.
+
+LibTorch ([PyTorch's C++ API](https://docs.pytorch.org/cppdocs/frontend.html)) also
+provides GPU tensor operations with CUDA stream and graph support, with an
+additional runtime dependency to package and maintain.
+Consider a custom CUDA kernel when available implementations do not fit a
+specialized transformation or layout.
+
+See [GR00T GPU execution](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#gpu-execution)
+for MatX joint indexing and a fused image kernel captured with TensorRT inference.
+
+## Programming guidelines for improving determinism
+
+Resource isolation limits competition, but allocation, synchronization, and kernel
+submission can still introduce variable delays within a workload. To make recurring
+GPU execution more predictable, reuse allocated memory, keep synchronization scoped
+to the work that needs it, and use CUDA Graphs to reduce repeated launch overhead.
+The following guidelines address each source of variation.
+
+### Eliminate CUDA allocations from steady-state execution
+
+CUDA allocation and deallocation can introduce synchronization or long host
+stalls that affect other workloads sharing the GPU. If the trace shows recurring
+`cudaMalloc`, `cudaFree`, host-pinning calls, or framework allocator misses, move
+the corresponding model setup, workspace allocation, and buffer creation into
+initialization.
+
+Avoid unnecessary buffer initialization, such as filling a buffer with zeros when
+the next operation writes every value before reading it.
+
+For outputs that need fresh storage on every callback, use Holoscan's
+[runtime-owned Tensor pools][hsdk-tensors]. Declare bounded output shapes and
+`TensorOutputStorage::kRuntimePool`, then borrow storage with `allocate_tensor()`.
+Size bounds and queues for the intended number of in-flight messages. Scratch
+buffers that remain private to an operator can instead be allocated once and
+reused on its assigned stream. For asynchronous host/device transfers, preallocate
+pinned host buffers too.
+
+Use the SDK's Tensor leases and stream ordering to avoid overwriting buffers
+still in use downstream. Release imported DLPack objects according to their
+ownership contract. If a pool gradually exhausts, inspect retained messages and
+leases before increasing its capacity.
+
+### Remove unintended synchronization
+
+Legacy-default-stream operations and synchronous copies can couple otherwise
+independent GPU workloads. To preserve their independence, submit kernels and
+asynchronous copies on the Holoscan-provided stream. With MatX, pass that stream
+to [`matx::cudaExecutor`](https://nvidia.github.io/MatX/basics/concepts.html#executor)
+when running expressions. When using PyTorch, establish
+a stream guard for that external stream around Torch operations in each callback
+according to its [stream semantics](https://docs.pytorch.org/docs/2.9/notes/cuda.html#cuda-streams);
+a stream selected on another host thread does not apply there.
+
+Host readbacks are another source of waits: `tensor.item()`, CPU transfers, and
+data-dependent shape operations can force the CPU to wait for GPU results. Keep
+intermediate results on the GPU where possible. When the CPU needs a result, copy
+it into a preallocated pinned buffer and wait for completion before reading it.
+Pageable host memory can make even an asynchronous copy block the calling thread;
+see [CUDA synchronization behavior][cuda-sync].
+
+When the result stays on the GPU, Holoscan's [Tensor stream contract][hsdk-tensors]
+provides readiness and release fences that order access without blocking the host.
+
+### Investigate CUDA work-queue contention
+
+Independent streams can still share CUDA hardware work queues, creating false
+dependencies. If interference remains after fixing stream dependencies and
+allocations, compare the default `CUDA_DEVICE_MAX_CONNECTIONS` value with `32`.
+Set it in the application process environment before CUDA initialization,
+including inside the container.
+
+More connections can reduce queue sharing, but do not reserve an exclusive queue
+for each stream or guarantee concurrency. Applications with few active streams
+may see no benefit. See the [CUDA environment-variable reference][cuda-connections].
+
+### Use CUDA Graphs to reduce launch overhead
+
+When a repeated GPU chain submits many small kernels, capture its work once and
+replay it as a CUDA Graph to reduce host launch overhead and interference with
+other workloads.
+
+To capture a chain of Holoscan operators, place it in a
+[CUDA Graph region][hsdk-cuda-graphs]. The chain must use linear Tensor connections,
+fixed shapes, runtime-pooled storage, queue depth one, and one consistent CUDA
+device/context. Mark each member with `spec.cuda_graph_capture_eligible()`, then
+apply the region constraint:
+
+```cpp
+graph.region("transforms")
+    .add(preprocess)
+    .add(transform)
+    .constrain(holoscan::RegionConstraint::cuda_graph());
+```
+
+The runtime captures these callbacks once and replays their GPU work on subsequent
+activations. CPU side effects therefore occur only during capture; keep per-cycle
+CPU logic outside the region.
+
+If an operator captures a library or inference engine internally, prepare that
+capture so each replay uses valid buffers, state, and placement:
+
+- Warm up the engine and allocate its workspaces before capture.
+- Keep captured input/output addresses stable; stage new inputs into those buffers
+  and refresh changing state, such as random inputs, before each replay.
+- Capture in the assigned CUDA context. Launching a graph captured in the ordinary
+  context on a Green Context stream does not retroactively place captured work.
+  Holoscan regions manage capture and replay streams in the selected context.
+- Remove data-dependent host readbacks only when an equivalent fixed-shape
+  computation is possible. Bake a value into an exported model only if it is
+  constant for every supported input in that deployment.
+
+Submit capture-compatible MatX operations through its CUDA executor on the capturing
+stream. The [GR00T implementation](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#gpu-execution)
+captures joint gather/scatter together with inference.
+For LibTorch-managed capture, use
+[`at::cuda::CUDAGraph`](https://github.com/pytorch/pytorch/blob/v2.9.1/aten/src/ATen/cuda/CUDAGraph.h).
+PyTorch's [capture guidance](https://docs.pytorch.org/docs/2.9/notes/cuda.html#cuda-graphs)
+covers warmup and long-lived input/output tensors; its
+[graph memory management](https://docs.pytorch.org/docs/2.9/notes/cuda.html#graph-memory-management)
+describes private memory pools configured by PyTorch's capture APIs.
+
+## Architectural patterns for different-rate workloads
+
+Resource isolation reduces competition, but data dependencies can still make a
+critical workload wait for other work. Choose how results cross each dependency
+boundary based on where they are consumed and how fresh they must be.
+
+### Publish completed results
+
+To keep a GPU-to-CPU transfer wait out of a critical consumer's callback, complete
+the transfer in the producing workload before publishing its CPU-readable result.
+Place the producer in its own execution partition and signal readiness with a
+completion event, or wait on its stream when a blocking callback is acceptable.
+If the consumer also runs on the GPU, use Holoscan's asynchronous Tensor path instead.
+
+### Consume the latest completed result
+
+Publishing completed results avoids transfer waits, but requiring a new result on
+every activation still ties a consumer to its producers' rates. If a critical
+workload can use older results, let it run at its own cadence using the latest
+completed inputs. For example, a critical control workload can consume the latest
+completed inference result instead of waiting for the next inference.
+
+Use Holoscan [temporal contracts][hsdk-temporal] to define the consumer's cadence,
+sample-age limits, and fallbacks for missing or stale inputs. Preserve capture
+timestamps, since processing delays and dropped updates can make results older
+than a producer's expected period.
+
+To keep only the newest arrival when intermediate results may be dropped, use a
+depth-one `QueuePolicy::kDropOldest` connection. This sets queue retention; the
+temporal contract still determines sample selection. Larger queues retain more
+history but can increase output age under overload.
+
+### Bound work submitted ahead of GPU completion
+
+A callback can finish submitting GPU work while that work is still running.
+A small message queue therefore does not by itself bound the amount of queued GPU
+work. If a workload runs ahead and delays critical kernels, gate its next
+submission on completion of the previous one, or enforce another measured finite
+limit.
+
+To enforce the limit, use a completion event to control readiness for the next
+submission, or wait on that workload's stream before returning from its callback.
+The blocking form occupies that partition's thread. Apply the same limit to CUDA
+Graph replays if their submissions can outpace GPU completion.
+
+### Group small sequential operations
+
+If scheduling and message transfers dominate tiny computations, group related
+sequential work into one operator or use an eligible CUDA Graph region. Retain
+separate partitions for workloads that need concurrency; a larger callback delays
+other work in its partition.
+
+[hsdk-partitions]: https://docs.nvidia.com/holoscan/sdk-user-guide/composing-applications/graph-composition#execution-partitions
+[hsdk-placement]: https://docs.nvidia.com/holoscan/sdk-user-guide/configuration/configuring-applications#deployment-bindings-requesting-placement-at-compile-time
+[hsdk-green]: https://docs.nvidia.com/holoscan/sdk-user-guide/advanced/cuda-green-contexts
+[hsdk-tensors]: https://docs.nvidia.com/holoscan/sdk-user-guide/data-and-payloads/tensors-in-depth
+[hsdk-cuda-graphs]: https://docs.nvidia.com/holoscan/sdk-user-guide/composing-applications/cuda-graph-regions
+[hsdk-temporal]: https://docs.nvidia.com/holoscan/sdk-user-guide/building-operators/temporal-contracts
+[cuda-sync]: https://docs.nvidia.com/cuda/cuda-runtime-api/api-sync-behavior.html
+[linux-preempt-rt]: https://www.kernel.org/doc/html/latest/core-api/real-time/theory.html
+[cuda-connections]: https://docs.nvidia.com/cuda/cuda-programming-guide/05-appendices/environment-variables.html#cuda-device-max-connections

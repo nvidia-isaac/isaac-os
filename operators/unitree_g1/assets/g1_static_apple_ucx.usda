@@ -1,0 +1,241 @@
+#usda 1.0
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+(
+    customLayerData = {
+        dictionary cameraSettings = {
+            dictionary Perspective = {
+                double3 position = (-0.18, 1.90, 1.25)
+                double3 target = (0.5785, 0.27, -0.0079)
+            }
+            string boundCamera = "/apple_isometric_camera"
+        }
+    }
+    defaultPrim = "g1"
+    metersPerUnit = 1
+    upAxis = "Z"
+    # A nonzero timeline range lets simulation time advance during playback.
+    startTimeCode = 0
+    endTimeCode = 1000000
+    subLayers = [
+        @g1_ucx.usda@
+    ]
+)
+
+# Static apple-to-plate scene layered over g1_ucx.usda.
+
+over "g1" (
+    prepend apiSchemas = ["MaterialBindingAPI"]
+)
+{
+    rel material:binding = </RobotLooks/WhiteRobotMaterial> (
+        bindMaterialAs = "strongerThanDescendants"
+    )
+    # Align the robot with the Galileo floor.
+    double3 xformOp:translate = (0.25, 0.08, -0.06776)
+
+    over "joints"
+    {
+        # Arena task upper-body drive gains. These stronger opinions override the canonical G1
+        # gains inherited from g1_ucx.usda; lower-body gains remain inherited unchanged.
+        over "left_shoulder_pitch_joint"
+        {
+            float drive:angular:physics:damping = 0.0872665
+            float drive:angular:physics:stiffness = 1.74533
+        }
+
+        over "left_shoulder_roll_joint"
+        {
+            float drive:angular:physics:damping = 0.0872665
+            float drive:angular:physics:stiffness = 1.74533
+            float drive:angular:physics:targetPosition = 14.32394488
+            float state:angular:physics:position = 14.32394488
+        }
+
+        over "left_shoulder_yaw_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.698132
+            float drive:angular:physics:targetPosition = 28.64788976
+            float state:angular:physics:position = 28.64788976
+        }
+
+        over "left_elbow_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.698132
+        }
+
+        over "left_wrist_roll_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.349066
+        }
+
+        over "left_wrist_pitch_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.349066
+        }
+
+        over "left_wrist_yaw_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.349066
+        }
+
+        over "right_shoulder_pitch_joint"
+        {
+            float drive:angular:physics:damping = 0.0872665
+            float drive:angular:physics:stiffness = 1.74533
+        }
+
+        over "right_shoulder_roll_joint"
+        {
+            float drive:angular:physics:damping = 0.0872665
+            float drive:angular:physics:stiffness = 1.74533
+            float drive:angular:physics:targetPosition = -14.32394488
+            float state:angular:physics:position = -14.32394488
+        }
+
+        over "right_shoulder_yaw_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.698132
+            float drive:angular:physics:targetPosition = -28.64788976
+            float state:angular:physics:position = -28.64788976
+        }
+
+        over "right_elbow_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.698132
+        }
+
+        over "right_wrist_roll_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.349066
+        }
+
+        over "right_wrist_pitch_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.349066
+        }
+
+        over "right_wrist_yaw_joint"
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 0.349066
+        }
+    }
+}
+
+def Scope "RobotLooks"
+{
+    def Material "WhiteRobotMaterial"
+    {
+        token outputs:surface.connect = </RobotLooks/WhiteRobotMaterial/PreviewSurface.outputs:surface>
+
+        def Shader "PreviewSurface"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (1, 1, 1)
+            float inputs:metallic = 0
+            float inputs:opacity = 1
+            float inputs:roughness = 0.35
+            token outputs:surface
+        }
+    }
+}
+
+# Disable the Simple Warehouse environment inherited from g1_ucx.usda.
+over "Environment" (
+    active = false
+)
+{
+}
+
+def Xform "galileo_locomanip" (
+    references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/IsaacLab/Arena/assets/background_library/galileo_locomanip/galileo_locomanip.usd@
+)
+{
+    quatf xformOp:orient = (1, 0, 0, 0)
+    float3 xformOp:scale = (1, 1, 1)
+    double3 xformOp:translate = (4.420, 1.408, -0.795)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+    # Remove the background props that overlap the static apple task workspace.
+    over "BackgroundAssets"
+    {
+        over "boxes"
+        {
+            over "jetson_orin_06" (
+                active = false
+            )
+            {
+            }
+
+            over "jetson_orin_03" (
+                active = false
+            )
+            {
+            }
+
+            over "hesai_box_06" (
+                active = false
+            )
+            {
+            }
+        }
+    }
+}
+
+def Xform "apple_01_objaverse_robolab" (
+    references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/IsaacLab/Arena/assets/object_library/srl_robolab_assets/objects/objaverse/apple_01.usd@
+)
+{
+    quatf xformOp:orient = (1, 0, 0, 0)
+    float3 xformOp:scale = (0.009, 0.009, 0.009)
+    double3 xformOp:translate = (0.5785, 0.27, -0.0079)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+}
+
+def Xform "clay_plates_hot3d_robolab" (
+    references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/IsaacLab/Arena/assets/object_library/srl_robolab_assets/objects/hot3d/clay_plates.usd@
+)
+{
+    quatf xformOp:orient = (1, 0, 0, 0)
+    float3 xformOp:scale = (0.5, 0.5, 0.5)
+    double3 xformOp:translate = (0.5785, 0.06, -0.025)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+}
+
+# Task overview camera.
+def Camera "apple_isometric_camera"
+{
+    float2 clippingRange = (0.01, 100)
+    float focalLength = 24
+    float focusDistance = 2.1942
+    float horizontalAperture = 20.955
+    custom uniform vector3d omni:kit:centerOfInterest = (0, 0, -2.1942)
+    float3 xformOp:rotateXYZ = (55.0205, 0, -155.0457)
+    double3 xformOp:translate = (-0.18, 1.90, 1.25)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+}
+
+# Invisible shelf support collider.
+def Cube "static_pick_place_shelf_support" (
+    prepend apiSchemas = ["PhysicsCollisionAPI"]
+)
+{
+    token purpose = "guide"
+    double size = 1
+    token visibility = "invisible"
+    float3 xformOp:scale = (0.44, 1.56, 0.04)
+    double3 xformOp:translate = (0.6928, 0.0082, -0.05)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+}

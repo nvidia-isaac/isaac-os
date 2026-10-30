@@ -1,0 +1,21 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+namespace isaac;
+
+// Describes the state of an ordered set of joints using CPU arrays.
+table JointStateCpu {
+  position: [float] (id: 0, required);
+  velocity: [float] (id: 1, required);
+
+  // Names of the joints, in the same order as position/velocity/effort. Optional: not
+  // every producer/consumer of this message needs joint names.
+  name: [string] (id: 2);
+
+  // Actuator effort applied in each joint (Newton meters or Newtons). Optional: not every
+  // producer of this message reports effort.
+  effort: [float] (id: 3);
+}
+
+root_type JointStateCpu;
+file_identifier "ISJS";

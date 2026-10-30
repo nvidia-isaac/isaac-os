@@ -1,0 +1,62 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "cpu",
+    "description": "7-DoF arm control benchmark on Holoscan 5 with fixed IK on the CPU or GPU in clean, contended, and Green Context-isolated scenarios.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "cpu": {
+        "description": "Run fixed CPU IK without the contention operator.",
+        "run": {
+          "command": "<isaac_app_bin>/robot_control_benchmark --config-path=applications/robot_control_benchmark/config/robot_control_benchmark_config.yaml --scenario=clean --motion-backend=cpu-ik",
+          "workdir": "isaac_root"
+        }
+      },
+      "gpu-clean": {
+        "description": "Run fixed GPU IK without the contention operator.",
+        "run": {
+          "command": "<isaac_app_bin>/robot_control_benchmark --config-path=applications/robot_control_benchmark/config/robot_control_benchmark_config.yaml --scenario=clean --motion-backend=gpu-ik",
+          "workdir": "isaac_root"
+        }
+      },
+      "gpu-contended": {
+        "description": "Run fixed GPU IK beside the fixed GPU contention workload.",
+        "run": {
+          "command": "<isaac_app_bin>/robot_control_benchmark --config-path=applications/robot_control_benchmark/config/robot_control_benchmark_config.yaml --scenario=contended --motion-backend=gpu-ik",
+          "workdir": "isaac_root"
+        }
+      },
+      "gpu-isolated": {
+        "description": "Run the same two workloads with the control partition in a CUDA Green Context.",
+        "run": {
+          "command": "<isaac_app_bin>/robot_control_benchmark --config-path=applications/robot_control_benchmark/config/robot_control_benchmark_config.yaml --scenario=isolated --motion-backend=gpu-ik",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "robot_control_benchmark",
+    "platforms": [
+      "x86_64",
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "tags": [
+      "robotics",
+      "benchmark"
+    ],
+    "version": "1.0.0"
+  }
+}

@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# G1 static-apple TensorRT model configuration. The ONNX bundle is fetched from
+# nvidia/GN1x-Tuned-Arena-G1-Static-PickNPlace at commit
+# 7f78bebf1a90131e7304beacfcd47eb27bad16ab.
+gr00t_n1_7:
+  num_joints: 43
+  chunk_size: 40
+  max_action_horizon: 40
+  max_state_dim: 132
+  noise_seed: 0
+  sync_after_compute: false
+  pool_blocks: 4
+
+  models:
+    - path: data/gr00t_n1_7/g1_static_apple_sim/preprocess_video.onnx
+      inputs:
+        ego_view: "input.video.ego_view"
+      outputs:
+        pixel_values: "stage.pixel_values"
+        input_ids: "stage.input_ids"
+        attention_mask: "stage.attention_mask"
+        embodiment_id: "stage.embodiment_id"
+
+    - path: data/gr00t_n1_7/g1_static_apple_sim/preprocess_state.onnx
+      inputs:
+        left_arm: "input.state.left_arm"
+        right_arm: "input.state.right_arm"
+        left_hand: "input.state.left_hand"
+        right_hand: "input.state.right_hand"
+        waist: "input.state.waist"
+      outputs:
+        state: "stage.state"
+        reference_0_left_arm: "_unused_reference_0_left_arm"
+        reference_0_right_arm: "_unused_reference_0_right_arm"
+        reference_0_left_hand: "_unused_reference_0_left_hand"
+        reference_0_right_hand: "_unused_reference_0_right_hand"
+        reference_0_waist: "_unused_reference_0_waist"
+
+    - path: data/gr00t_n1_7/g1_static_apple_sim/backbone.onnx
+      inputs:
+        vl_input_input_ids: "stage.input_ids"
+        vl_input_attention_mask: "stage.attention_mask"
+        vl_input_pixel_values: "stage.pixel_values"
+      outputs:
+        converted_outputs_backbone_features: "stage.backbone_features"
+        converted_outputs_backbone_attention_mask: "stage.backbone_attention_mask"
+        converted_outputs_image_mask: "stage.image_mask"
+
+    - path: data/gr00t_n1_7/g1_static_apple_sim/action_head.onnx
+      inputs:
+        backbone_outputs_backbone_features: "stage.backbone_features"
+        backbone_outputs_backbone_attention_mask: "stage.backbone_attention_mask"
+        backbone_outputs_image_mask: "stage.image_mask"
+        action_inputs_state: "stage.state"
+        action_inputs_embodiment_id: "stage.embodiment_id"
+        initial_noise: "noise.initial"
+      outputs:
+        output1_action_pred: "stage.action_pred"
+        output1_backbone_features: "_unused_backbone_features"
+        output1_state_features: "_unused_state_features"
+
+    - path: data/gr00t_n1_7/g1_static_apple_sim/decode_action.onnx
+      inputs:
+        normalized_action: "stage.action_pred"
+      outputs:
+        left_arm: "output.left_arm"
+        right_arm: "output.right_arm"
+        left_hand: "output.left_hand"
+        right_hand: "output.right_hand"
+        waist: "output.waist"
+        base_height_command: "output.base_height_command"
+        navigate_command: "output.navigate_command"

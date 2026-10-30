@@ -1,0 +1,30 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# System configuration
+
+<Note>
+Benchmark results are only comparable on the same host settings. This page lists the
+AGX Thor configuration used for Isaac OS reference benchmarks. To apply, verify or
+restore it, follow [Optimize your host](/isaac-os/how-to/optimize-your-host).
+</Note>
+
+## AGX Thor reference configuration
+
+[`tools/host_preflight.py`](../../tools/host_preflight.py) checks a host against these settings.
+Apply them in the order listed; some changes require a reboot.
+
+| Setting | Reference value | Setup |
+| --- | --- | --- |
+| Kernel | PREEMPT_RT for JetPack 7.2.1; `/sys/kernel/realtime` reports `1` | [Use a real-time kernel](/isaac-os/how-to/optimize-your-host#jetpack-rt-kernel) |
+| CPU isolation | CPUs 0-13 online; 8-13 isolated; housekeeping and IRQs on 0-7 (`isolcpus=domain,managed_irq,8-13 irqaffinity=0-7 kthread_cpus=0-7`) | [Reduce scheduling interference](/isaac-os/how-to/optimize-your-host#reduce-scheduling-interference) |
+| Tickless and RCU offload | Not enabled; the prebuilt kernel lacks `CONFIG_NO_HZ_FULL` and `CONFIG_RCU_NOCB_CPU` | [Reduce scheduling interference](/isaac-os/how-to/optimize-your-host#reduce-scheduling-interference) |
+| RT CPU budget | Unlimited (`kernel.sched_rt_runtime_us=-1`) | [Real-time CPU budget](/isaac-os/how-to/optimize-your-host#real-time-cpu-budget) |
+| Power mode | 120W (mode `1` on T5000) | [Power mode and clocks](/isaac-os/how-to/optimize-your-host#power-mode-and-clocks) |
+| Clocks and idle states | CPU, GPU, video and EMC clocks locked to the mode's maximums; CPU idle states disabled (`jetson_clocks`) | [Power mode and clocks](/isaac-os/how-to/optimize-your-host#power-mode-and-clocks) |
+| Display manager | Inactive, unless a display is needed | [Run without a desktop](/isaac-os/how-to/optimize-your-host#run-without-a-desktop) |
+
+These are host settings only. Applications set their own thread placement and
+scheduling; check them separately.

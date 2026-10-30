@@ -1,0 +1,41 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "record",
+    "description": "Minimal reference application for common/mcap_logger: attaches HsdkMcapLogger to eight clock-triggered topics -- two single-joint isaac.JointStateCpu waveforms, a shared circular-motion isaac.PoseCpu/TwistCpu/TransformCpu, a fixed isaac.CameraInfoCpu, and the same tensor-schema holoscan.schema.Image counter stream recorded twice for comparison -- once raw at 640x480 and once as 1920x1080 hardware-encoded video with a metadata sidecar channel on a host with a usable hardware encoder, omitting the encoded topic and its sidecar where there is none -- and records them to an .mcap file for a configurable duration.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "record": {
+        "description": "Record 10 seconds of sine_joint_state, cosine_joint_state, circular_pose, circular_twist, circular_transform, camera_info, counter_image, and counter_image_encoded, plus counter_image_encoded/metadata where the host can encode.",
+        "run": {
+          "command": "<isaac_app_bin>/mcap_logger_reference --duration-s=10",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "mcap_logger_reference",
+    "platforms": [
+      "x86_64",
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "tags": [
+      "example",
+      "reference"
+    ],
+    "version": "0.1.0"
+  }
+}

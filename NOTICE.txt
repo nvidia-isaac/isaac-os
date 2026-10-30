@@ -1,0 +1,1164 @@
+Isaac OS
+Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This product includes software developed at NVIDIA CORPORATION (https://www.nvidia.com/).
+
+Isaac OS uses the following open source software in its source distribution:
+
+breathe (https://github.com/breathe-doc/breathe)
+Copyright (c) 2009, Michael Jones
+Licensed under BSD-3-Clause (https://github.com/breathe-doc/breathe/blob/v4.36.0/LICENSE) [BSD-3-Clause]
+
+build-essential (https://packages.ubuntu.com/noble/build-essential)
+Licensed under GPL-2.0-or-later (https://packages.ubuntu.com/noble/build-essential) [GPL-2.0-or-later]
+
+cli11 (https://github.com/CLIUtils/CLI11)
+CLI11 2.6.2 Copyright (c) 2017-2026 University of Cincinnati, developed by Henry
+Schreiner under NSF AWARD 1414736. All rights reserved.
+Licensed under BSD-3-Clause (https://github.com/CLIUtils/CLI11/blob/v2.6.2/LICENSE) [BSD-3-Clause]
+
+cmake (https://cmake.org/)
+Copyright 2000-2026 Kitware, Inc. and Contributors
+Licensed under BSD-3-Clause (https://github.com/Kitware/CMake/blob/v4.4.4/LICENSE.rst) [BSD-3-Clause]
+
+codespell (https://github.com/codespell-project/codespell)
+Copyright (C) 2010-2011 Lucas De Marchi
+Licensed under GPL-2.0-only (https://github.com/codespell-project/codespell/blob/v2.4.1/COPYING) [GPL-2.0-only]
+
+cpm (https://github.com/cpm-cmake/CPM.cmake)
+Copyright (c) 2019-2022 Lars Melchior and contributors
+Licensed under MIT (https://github.com/cpm-cmake/CPM.cmake/blob/v0.42.1/LICENSE) [MIT]
+
+cuvslam (https://github.com/nvidia-isaac/cuVSLAM)
+Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
+Licensed under NVIDIA-Community-License (https://github.com/nvidia-isaac/cuVSLAM/blob/v17.0.1/LICENSE) [NVIDIA-Community-License]
+
+doxygen (https://www.doxygen.nl/)
+Copyright (C) 1997-2021 by Dimitri van Heesch
+Licensed under GPL-2.0-only (https://github.com/doxygen/doxygen/blob/Release_1_9_1/LICENSE) [GPL-2.0-only]
+
+eigen (https://gitlab.com/libeigen/eigen)
+Copyright (c) 2011, Intel Corporation
+Licensed under BSD-3-Clause (https://gitlab.com/libeigen/eigen/-/raw/3.4.0/COPYING.BSD) [BSD-3-Clause]
+
+flatbuffers (https://github.com/google/flatbuffers)
+Copyright 2014 Google Inc.
+Licensed under Apache-2.0 (https://github.com/google/flatbuffers/blob/v25.12.19/LICENSE) [Apache-2.0]
+
+foxglove-sdk (https://github.com/foxglove/foxglove-sdk)
+Copyright (c) Foxglove Technologies Inc
+Licensed under MIT (https://github.com/foxglove/foxglove-sdk/blob/sdk/v0.14.3/LICENSE) [MIT]
+
+ftservo (https://github.com/ftservo/FTServo_Linux)
+Copyright (c) 2024 FTServo
+Licensed under MIT (https://github.com/ftservo/FTServo_Linux/blob/064a6dbf814477b970959b5b01b2fc9bc594afa3/LICENSE) [MIT]
+
+git-lfs (https://github.com/git-lfs/git-lfs)
+Copyright (c) 2013-2018 GitHub, Inc. and Git LFS contributors
+Licensed under MIT (https://github.com/git-lfs/git-lfs/blob/v3.4.1/LICENSE.md) [MIT]
+
+git (https://git-scm.com/)
+Copyright (c) 2005-2023 Linus Torvalds and others
+Licensed under GPL-2.0-only (https://github.com/git/git/blob/v2.43.0/COPYING) [GPL-2.0-only]
+
+googletest (https://github.com/google/googletest)
+Copyright 2008, Google Inc.
+Licensed under BSD-3-Clause (https://github.com/google/googletest/blob/v1.17.0/LICENSE) [BSD-3-Clause]
+
+holohub (https://github.com/nvidia-holoscan/holohub)
+Copyright (c) 2022-2026 NVIDIA CORPORATION & AFFILIATES
+Licensed under Apache-2.0 (https://github.com/nvidia-holoscan/holohub/blob/holoscan-sdk-4.6.0/LICENSE) [Apache-2.0]
+
+holoscan-camera (https://github.com/nvidia-holoscan/holoscan-camera/tree/v1.0.0)
+Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Licensed under Apache-2.0 (https://github.com/nvidia-holoscan/holoscan-camera/blob/v1.0.0/LICENSE) [Apache-2.0]
+
+holoscan-cli (https://github.com/nvidia-holoscan/holoscan-cli)
+Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Licensed under Apache-2.0 (https://github.com/nvidia-holoscan/holoscan-cli/blob/268bf4d2ecb3c2295a73631d2476ef6c99734b38/LICENSE) [Apache-2.0]
+
+holoscan-sdk (https://github.com/nvidia-holoscan/holoscan-sdk)
+Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Licensed under Apache-2.0 (https://github.com/nvidia-holoscan/holoscan-sdk/blob/main/LICENSE.txt) [Apache-2.0]
+
+holoscan-sensor-bridge (https://github.com/nvidia-holoscan/holoscan-sensor-bridge)
+Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Licensed under Apache-2.0 (https://github.com/nvidia-holoscan/holoscan-sensor-bridge/blob/2.7.0/LICENSE) [Apache-2.0]
+
+iceoryx2 (https://github.com/eclipse-iceoryx/iceoryx2)
+Copyright (c) 2023 Contributors to the Eclipse Foundation
+Copyright (c) 2024 Contributors to the Eclipse Foundation
+Licensed under Apache-2.0 (https://github.com/eclipse-iceoryx/iceoryx2/blob/6ef7c55176a8487ae7ca53c2e0649d5df9a1b3b4/LICENSE-APACHE) [Apache-2.0]
+
+kitware-archive-keyring (https://gitlab.kitware.com/debian/kitware-archive-keyring)
+Copyright (c) 2018 Kitware, Inc.
+Licensed under BSD-3-Clause (https://gitlab.kitware.com/debian/kitware-archive-keyring/-/blob/master/debian/copyright) [BSD-3-Clause]
+
+librmm-cu12 (https://github.com/rapidsai/rmm)
+Copyright (c) 2018-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Licensed under Apache-2.0 (https://github.com/rapidsai/rmm/blob/v25.06.00/LICENSE) [Apache-2.0]
+
+libucx-cu12 (https://github.com/openucx/ucx)
+Copyright (c) 2014-2020 NVIDIA CORPORATION & AFFILIATES, UT-Battelle, LLC, and The University of Houston System. All rights reserved.
+Licensed under BSD-3-Clause (https://github.com/openucx/ucx/blob/v1.19.0/LICENSE) [BSD-3-Clause]
+
+libucxx-cu12 (https://github.com/rapidsai/ucxx)
+Copyright (c) 2022-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Licensed under BSD-3-Clause (https://github.com/rapidsai/ucxx/blob/v0.44.00/LICENSE) [BSD-3-Clause]
+
+lld (https://lld.llvm.org/)
+Copyright (c) 2003-2017 University of Illinois at Urbana-Champaign.
+Licensed under Apache-2.0 WITH LLVM-exception (https://github.com/llvm/llvm-project/blob/llvmorg-18.1.3/lld/LICENSE.TXT) [Apache-2.0 WITH LLVM-exception]
+
+markdownlint-cli (https://github.com/igorshubovych/markdownlint-cli)
+Copyright (c) 2016-2020 Igor Shubovych
+Licensed under MIT (https://github.com/igorshubovych/markdownlint-cli/blob/v0.47.0/LICENSE) [MIT]
+
+matx (https://github.com/NVIDIA/MatX)
+Copyright (c) 2021, NVIDIA Corporation
+Licensed under BSD-3-Clause (https://github.com/NVIDIA/MatX/blob/v1.0.0/LICENSE) [BSD-3-Clause]
+
+mcap (https://github.com/foxglove/mcap)
+Copyright (c) Foxglove Technologies Inc
+Licensed under MIT (https://github.com/foxglove/mcap/blob/releases/cpp/v1.4.0/LICENSE) [MIT]
+
+mcap_builder (https://github.com/olympus-robotics/mcap_builder)
+Copyright (c) 2023 MCAP_BUILDER Contributors
+Licensed under MIT (https://github.com/olympus-robotics/mcap_builder/blob/d6f3662b7204341797eaeca5ff97b8f659d02bda/LICENSE) [MIT]
+
+mirrors-clang-format (https://github.com/pre-commit/mirrors-clang-format)
+Copyright (c) 2021 Anthony Sottile
+Licensed under MIT (https://github.com/pre-commit/mirrors-clang-format/blob/v21.1.8/LICENSE) [MIT]
+
+mirrors-mypy (https://github.com/pre-commit/mirrors-mypy)
+Copyright (c) 2014 Anthony Sottile
+Licensed under MIT (https://github.com/pre-commit/mirrors-mypy/blob/v1.19.1/LICENSE) [MIT]
+
+mold (https://github.com/rui314/mold)
+Copyright (c) 2023 Rui Ueyama
+Licensed under MIT (https://github.com/rui314/mold/blob/v2.40.4/LICENSE) [MIT]
+
+myst-parser (https://github.com/executablebooks/MyST-Parser)
+Copyright (c) 2020 ExecutableBookProject
+Licensed under MIT (https://github.com/executablebooks/MyST-Parser/blob/v3.0.1/LICENSE) [MIT]
+
+ninja-build (https://ninja-build.org/)
+Copyright (c) 2011-2014 Google
+Licensed under Apache-2.0 (https://github.com/ninja-build/ninja/blob/v1.11.1/COPYING) [Apache-2.0]
+
+nlohmann_json (https://github.com/nlohmann/json)
+Copyright (c) 2013-2022 Niels Lohmann
+Licensed under MIT (https://github.com/nlohmann/json/blob/v3.10.5/LICENSE.MIT) [MIT]
+
+nvidia-sphinx-theme (https://pypi.org/project/nvidia-sphinx-theme/)
+Licensed under LicenseRef-NVIDIA-SOFTWARE-LICENSE-AGREEMENT (https://pypi.org/project/nvidia-sphinx-theme/0.0.9.post1/) [LicenseRef-NVIDIA-SOFTWARE-LICENSE-AGREEMENT]
+
+nvidia-video-codec-sdk (https://developer.nvidia.com/video-codec-sdk)
+Copyright (c) 2010-2024 NVIDIA Corporation
+Licensed under LicenseRef-NvidiaDesignWorksSDK (https://developer.nvidia.com/video-codec-sdk) [LicenseRef-NvidiaDesignWorksSDK]
+
+patchelf (https://github.com/NixOS/patchelf)
+Copyright (c) 2004-2014 Eelco Dolstra <eelco.dolstra@logicblox.com>
+Licensed under GPL-3.0-or-later (https://github.com/NixOS/patchelf/blob/0.18.0/COPYING) [GPL-3.0-or-later]
+
+pre-commit-buildifier (https://github.com/keith/pre-commit-buildifier)
+Copyright (c) 2021 Keith Smiley (http://keith.so)
+Licensed under MIT (https://github.com/keith/pre-commit-buildifier/blob/8.2.1.1/LICENSE) [MIT]
+
+pre-commit-hooks (https://github.com/pre-commit/pre-commit-hooks)
+Copyright (c) 2014 pre-commit dev team: Anthony Sottile, Ken Struys
+Licensed under MIT (https://github.com/pre-commit/pre-commit-hooks/blob/v6.0.0/LICENSE) [MIT]
+
+pylint (https://github.com/pylint-dev/pylint)
+Copyright (c) 2003-2024 Logilab and pylint contributors
+Licensed under GPL-2.0-or-later (https://github.com/pylint-dev/pylint/blob/v4.0.4/LICENSE) [GPL-2.0-or-later]
+
+python3-colcon-common-extensions (https://github.com/colcon/colcon-common-extensions)
+Copyright 2016-2018 Dirk Thomas
+Licensed under Apache-2.0 (https://github.com/colcon/colcon-common-extensions/blob/0.3.0/LICENSE) [Apache-2.0]
+
+python3-rosdep (https://github.com/ros-infrastructure/rosdep)
+Copyright (c) 2013, Willow Garage, Inc.
+Licensed under BSD-3-Clause (https://github.com/ros-infrastructure/rosdep/blob/0.26.0/LICENSE) [BSD-3-Clause]
+
+pyyaml (https://github.com/yaml/pyyaml)
+Copyright (c) 2017-2021 Ingy döt Net
+Copyright (c) 2006-2016 Kirill Simonov
+Licensed under MIT (https://github.com/yaml/pyyaml/blob/6.0/LICENSE) [MIT]
+
+rapids-logger (https://github.com/rapidsai/rapids-logger)
+Copyright (c) 2024-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Licensed under Apache-2.0 (https://github.com/rapidsai/rapids-logger/blob/v0.1.1/LICENSE) [Apache-2.0]
+
+ros-humble-rclcpp (https://github.com/ros2/rclcpp)
+Copyright 2014 Open Source Robotics Foundation, Inc.
+Licensed under Apache-2.0 (https://github.com/ros2/rclcpp/blob/16.0.18/LICENSE) [Apache-2.0]
+
+ros-humble-ros-base (https://github.com/ros2/variants)
+Licensed under Apache-2.0 (https://github.com/ros2/variants/blob/0.10.0/LICENSE) [Apache-2.0]
+
+ros-humble-sensor-msgs (https://github.com/ros2/common_interfaces)
+Licensed under Apache-2.0 (https://github.com/ros2/common_interfaces/blob/4.9.1/LICENSE) [Apache-2.0]
+
+ros-humble-std-msgs (https://github.com/ros2/common_interfaces)
+Licensed under Apache-2.0 (https://github.com/ros2/common_interfaces/blob/4.9.1/LICENSE) [Apache-2.0]
+
+ros-jazzy-rclcpp (https://github.com/ros2/rclcpp)
+Copyright 2014 Open Source Robotics Foundation, Inc.
+Licensed under Apache-2.0 (https://github.com/ros2/rclcpp/blob/28.1.16/LICENSE) [Apache-2.0]
+
+ros-jazzy-ros-base (https://github.com/ros2/variants)
+Licensed under Apache-2.0 (https://github.com/ros2/variants/blob/0.11.0/LICENSE) [Apache-2.0]
+
+ros-jazzy-sensor-msgs (https://github.com/ros2/common_interfaces)
+Licensed under Apache-2.0 (https://github.com/ros2/common_interfaces/blob/5.3.6/sensor_msgs/LICENSE) [Apache-2.0]
+
+ros-jazzy-std-msgs (https://github.com/ros2/common_interfaces)
+Licensed under Apache-2.0 (https://github.com/ros2/common_interfaces/blob/5.3.6/std_msgs/LICENSE) [Apache-2.0]
+
+ros-lyrical-cuda-buffer (https://github.com/ros2/rosidl_buffer_backends)
+Licensed under Apache-2.0 (https://github.com/ros2/rosidl_buffer_backends/blob/0.1.2/LICENSE) [Apache-2.0]
+
+ros-lyrical-rclcpp (https://github.com/ros2/rclcpp)
+Copyright 2014 Open Source Robotics Foundation, Inc.
+Licensed under Apache-2.0 (https://github.com/ros2/rclcpp/blob/32.0.2/LICENSE) [Apache-2.0]
+
+ros-lyrical-ros-base (https://github.com/ros2/variants)
+Licensed under Apache-2.0 (https://github.com/ros2/variants/blob/0.13.0/LICENSE) [Apache-2.0]
+
+ros-lyrical-rosidl-buffer (https://github.com/ros2/rosidl)
+Licensed under Apache-2.0 (https://github.com/ros2/rosidl/blob/5.2.1/LICENSE) [Apache-2.0]
+
+ros-lyrical-sensor-msgs (https://github.com/ros2/common_interfaces)
+Licensed under Apache-2.0 (https://github.com/ros2/common_interfaces/blob/5.9.3/sensor_msgs/LICENSE) [Apache-2.0]
+
+ros-lyrical-std-msgs (https://github.com/ros2/common_interfaces)
+Licensed under Apache-2.0 (https://github.com/ros2/common_interfaces/blob/5.9.3/std_msgs/LICENSE) [Apache-2.0]
+
+ruff-pre-commit (https://github.com/astral-sh/ruff-pre-commit)
+Copyright (c) 2024 Astral Software Inc.
+Licensed under Apache-2.0 (https://github.com/astral-sh/ruff-pre-commit/blob/v0.12.11/LICENSE-APACHE) [Apache-2.0]
+
+sccache (https://github.com/rapidsai/sccache)
+Copyright 2016 Mozilla Foundation
+Licensed under Apache-2.0 (https://github.com/rapidsai/sccache/blob/v0.14.0-rapids.13/LICENSE) [Apache-2.0]
+
+sphinx-autoapi (https://github.com/readthedocs/sphinx-autoapi)
+Copyright (c) 2015 Read the Docs, Inc
+Licensed under MIT (https://github.com/readthedocs/sphinx-autoapi/blob/v3.8.0/LICENSE.rst) [MIT]
+
+sphinx-autobuild (https://github.com/sphinx-doc/sphinx-autobuild)
+Copyright (c) 2020, Pradyun Gedam; Copyright (c) 2013, Jonathan Stoppani
+Licensed under MIT (https://github.com/sphinx-doc/sphinx-autobuild/blob/main/LICENSE.rst) [MIT]
+
+sphinx-copybutton (https://github.com/executablebooks/sphinx-copybutton)
+Copyright (c) 2018 Chris Holdgraf
+Licensed under MIT (https://github.com/executablebooks/sphinx-copybutton/blob/v0.5.2/LICENSE) [MIT]
+
+sphinx-design (https://github.com/executablebooks/sphinx-design)
+Copyright (c) 2023 Chris Sewell
+Licensed under MIT (https://github.com/executablebooks/sphinx-design/blob/v0.7.0/LICENSE) [MIT]
+
+sphinx (https://www.sphinx-doc.org/)
+Copyright (c) 2007-2025 by the Sphinx team (see AUTHORS file).
+Licensed under BSD-2-Clause (https://github.com/sphinx-doc/sphinx/blob/v8.2.3/LICENSE.rst) [BSD-2-Clause]
+
+sphinxcontrib-mermaid (https://github.com/mgaitan/sphinxcontrib-mermaid)
+Copyright (c) 2016 by Martín Gaitán
+Licensed under BSD-2-Clause (https://github.com/mgaitan/sphinxcontrib-mermaid/blob/v2.0.1/LICENSE.rst) [BSD-2-Clause]
+
+types-docutils (https://github.com/python/typeshed)
+Copyright (c) 2015 Jukka Lehtosalo and contributors
+Licensed under Apache-2.0 (https://github.com/python/typeshed/blob/main/LICENSE) [Apache-2.0]
+
+types-markdown (https://github.com/python/typeshed)
+Copyright (c) 2015 Jukka Lehtosalo and contributors
+Licensed under Apache-2.0 (https://github.com/python/typeshed/blob/main/LICENSE) [Apache-2.0]
+
+types-pyyaml (https://github.com/python/typeshed)
+Copyright (c) 2015 Jukka Lehtosalo and contributors
+Licensed under Apache-2.0 (https://github.com/python/typeshed/blob/main/LICENSE) [Apache-2.0]
+
+types-requests (https://github.com/python/typeshed)
+Copyright (c) 2015 Jukka Lehtosalo and contributors
+Licensed under Apache-2.0 (https://github.com/python/typeshed/blob/main/LICENSE) [Apache-2.0]
+
+ucs (https://github.com/openucx/ucx)
+Copyright (c) 2014-2015 UT-Battelle, LLC. All rights reserved.
+Copyright (c) 2014-2020 NVIDIA corporation & affiliates. All rights reserved.
+Copyright (C) 2014-2015 The University of Houston System. All rights reserved.
+Copyright (C) 2015 The University of Tennessee and The University of Tennessee Research Foundation. All rights reserved.
+Copyright (C) 2016-2020 ARM Ltd. All rights reserved.
+Copyright (c) 2016 Los Alamos National Security, LLC. All rights reserved.
+Copyright (C) 2016-2020 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (C) 2019 UChicago Argonne, LLC. All rights reserved.
+Copyright (C) 2020 Huawei Technologies Co., Ltd. All rights reserved.
+Copyright (C) 2016-2020 Stony Brook University. All rights reserved.
+Licensed under BSD-3-Clause (https://github.com/openucx/ucx/blob/v1.19.0/LICENSE) [BSD-3-Clause]
+
+ucxx (https://github.com/rapidsai/ucxx)
+Copyright (c) 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Licensed under BSD-3-Clause (https://github.com/rapidsai/ucxx/blob/v0.46.00/LICENSE) [BSD-3-Clause]
+
+unitree-sdk2 (https://github.com/unitreerobotics/unitree_sdk2)
+Copyright (c) 2016-2023 HangZhou YuShu TECHNOLOGY CO.,LTD. ("Unitree Robotics")
+Licensed under BSD-3-Clause (https://github.com/unitreerobotics/unitree_sdk2/blob/2.0.2/LICENSE) [BSD-3-Clause]
+
+uv-pre-commit (https://github.com/astral-sh/uv-pre-commit)
+Copyright (c) 2024 Astral Software Inc.
+Licensed under Apache-2.0 (https://github.com/astral-sh/uv-pre-commit/blob/0.12.24/LICENSE-APACHE) [Apache-2.0]
+
+uv (https://github.com/astral-sh/uv)
+Copyright (c) 2025 Astral Software Inc.
+Licensed under Apache-2.0 (https://github.com/astral-sh/uv/blob/0.12.24/LICENSE-APACHE) [Apache-2.0]
+
+xvfb (https://www.x.org/)
+Copyright (c) 2011 Dave Airlie
+Copyright (c) 2000-2001 Juliusz Chroboczek
+Copyright (c) 1998 Egbert Eich
+Copyright (c) 2006-2007 Intel Corporation
+Copyright (c) 2006 Nokia Corporation
+Copyright (c) 2006-2008 Peter Hutterer
+Copyright (c) 2006 Adam Jackson
+Copyright (c) 2009-2010 NVIDIA Corporation
+Copyright (c) 1987, 2003-2006, 2008-2010 Oracle and/or its affiliates.
+Copyright (c) 1999 Keith Packard
+Copyright (c) 2007-2009 Red Hat, Inc.
+Copyright (c) 2005-2008 Daniel Stone
+Copyright (c) 2006-2009 Simon Thum
+Copyright (c) 2003-2008, 2013 Geert Uytterhoeven
+Copyright (c) 2006 Luc Verhaegen
+Licensed under MIT (https://gitlab.freedesktop.org/xorg/xserver/-/blob/xorg-server-21.1.12/COPYING) [MIT]
+
+yaml-cpp (https://github.com/jbeder/yaml-cpp)
+Copyright (c) 2008-2015 Jesse Beder.
+Licensed under MIT (https://github.com/jbeder/yaml-cpp/blob/0.8.0/LICENSE) [MIT]
+
+yamlfmt (https://github.com/google/yamlfmt)
+Copyright (c) 2022 Google LLC
+Licensed under Apache-2.0 (https://github.com/google/yamlfmt/blob/v0.21.0/LICENSE) [Apache-2.0]
+
+================================================================================
+FULL LICENSE TEXTS
+================================================================================
+
+[Apache-2.0]
+================================================================================
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+================================================================================
+
+[Apache-2.0 WITH LLVM-exception]
+================================================================================
+On Debian systems the full text of the Apache Software License 2.0 can be
+found in the `/usr/share/common-licenses/Apache-2.0' file.
+
+---- LLVM Exceptions to the Apache 2.0 License ----
+
+As an exception, if, as a result of your compiling your source code, portions
+of this Software are embedded into an Object form of such source code, you
+may redistribute such embedded portions in such Object form without complying
+with the conditions of Sections 4(a), 4(b) and 4(d) of the License.
+
+In addition, if you combine or link compiled forms of this Software with
+software that is licensed under the GPLv2 ("Combined Software") and if a
+court of competent jurisdiction determines that the patent provision (Section
+3), the indemnity provision (Section 9) or other Section of the License
+conflicts with the conditions of the GPLv2, you may retroactively and
+prospectively choose to deem waived or otherwise exclude such Section(s) of
+the License, but only in their entirety and only with respect to the Combined
+Software.
+================================================================================
+
+[BSD-2-Clause]
+================================================================================
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+* Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+================================================================================
+
+[BSD-3-Clause]
+================================================================================
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright notice,
+      this list of conditions and the following disclaimer in the documentation
+      and/or other materials provided with the distribution.
+    * Neither the name of the project nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+================================================================================
+
+[GPL-2.0-only]
+================================================================================
+                    GNU GENERAL PUBLIC LICENSE
+                       Version 2, June 1991
+
+ Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+ 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+                            Preamble
+
+  The licenses for most software are designed to take away your
+freedom to share and change it.  By contrast, the GNU General Public
+License is intended to guarantee your freedom to share and change free
+software--to make sure the software is free for all its users.  This
+General Public License applies to most of the Free Software
+Foundation's software and to any other program whose authors commit to
+using it.  (Some other Free Software Foundation software is covered by
+the GNU Lesser General Public License instead.)  You can apply it to
+your programs, too.
+
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that you
+have the freedom to distribute copies of free software (and charge for
+this service if you wish), that you receive source code or can get it
+if you want it, that you can change the software or use pieces of it
+in new free programs; and that you know you can do these things.
+
+  To protect your rights, we need to make restrictions that forbid
+anyone to deny you these rights or to ask you to surrender the rights.
+These restrictions translate to certain responsibilities for you if you
+distribute copies of the software, or if you modify it.
+
+  For example, if you distribute copies of such a program, whether
+gratis or for a fee, you must give the recipients all the rights that
+you have.  You must make sure that they, too, receive or can get the
+source code.  And you must show them these terms so they know their
+rights.
+
+  We protect your rights with two steps: (1) copyright the software, and
+(2) offer you this license which gives you legal permission to copy,
+distribute and/or modify the software.
+
+  Also, for each author's protection and ours, we want to make certain
+that everyone understands that there is no warranty for this free
+software.  If the software is modified by someone else and passed on, we
+want its recipients to know that what they have is not the original, so
+that any problems introduced by others will not reflect on the original
+authors' reputations.
+
+  Finally, any free program is threatened constantly by software
+patents.  We wish to avoid the danger that redistributors of a free
+program will individually obtain patent licenses, in effect making the
+program proprietary.  To prevent this, we have made it clear that any
+patent must be licensed for everyone's free use or not licensed at all.
+
+  The precise terms and conditions for copying, distribution and
+modification follow.
+
+                    GNU GENERAL PUBLIC LICENSE
+   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+  0. This License applies to any program or other work which contains
+a notice placed by the copyright holder saying it may be distributed
+under the terms of this General Public License.  The "Program", below,
+refers to any such program or work, and a "work based on the Program"
+means either the Program or any derivative work under copyright law:
+that is to say, a work containing the Program or a portion of it,
+either verbatim or with modifications and/or translated into another
+language.  (Hereinafter, translation is included without limitation in
+the term "modification".)  Each licensee is addressed as "you".
+
+Activities other than copying, distribution and modification are not
+covered by this License; they are outside its scope.  The act of
+running the Program is not restricted, and the output from the Program
+is covered only if its contents constitute a work based on the
+Program (independent of having been made by running the Program).
+Whether that is true depends on what the Program does.
+
+  1. You may copy and distribute verbatim copies of the Program's
+source code as you receive it, in any medium, provided that you
+conspicuously and appropriately publish on each copy an appropriate
+copyright notice and disclaimer of warranty; keep intact all the
+notices that refer to this License and to the absence of any warranty;
+and give any other recipients of the Program a copy of this License
+along with the Program.
+
+You may charge a fee for the physical act of transferring a copy, and
+you may at your option offer warranty protection in exchange for a fee.
+
+  2. You may modify your copy or copies of the Program or any portion
+of it, thus forming a work based on the Program, and copy and
+distribute such modifications or work under the terms of Section 1
+above, provided that you also meet all of these conditions:
+
+    a) You must cause the modified files to carry prominent notices
+    stating that you changed the files and the date of any change.
+
+    b) You must cause any work that you distribute or publish, that in
+    whole or in part contains or is derived from the Program or any
+    part thereof, to be licensed as a whole at no charge to all third
+    parties under the terms of this License.
+
+    c) If the modified program normally reads commands interactively
+    when run, you must cause it, when started running for such
+    interactive use in the most ordinary way, to print or display an
+    announcement including an appropriate copyright notice and a
+    notice that there is no warranty (or else, saying that you provide
+    a warranty) and that users may redistribute the program under
+    these conditions, and telling the user how to view a copy of this
+    License.  (Exception: if the Program itself is interactive but
+    does not normally print such an announcement, your work based on
+    the Program is not required to print an announcement.)
+
+These requirements apply to the modified work as a whole.  If
+identifiable sections of that work are not derived from the Program,
+and can be reasonably considered independent and separate works in
+themselves, then this License, and its terms, do not apply to those
+sections when you distribute them as separate works.  But when you
+distribute the same sections as part of a whole which is a work based
+on the Program, the distribution of the whole must be on the terms of
+this License, whose permissions for other licensees extend to the
+entire whole, and thus to each and every part regardless of who wrote it.
+
+Thus, it is not the intent of this section to claim rights or contest
+your rights to work written entirely by you; rather, the intent is to
+exercise the right to control the distribution of derivative or
+collective works based on the Program.
+
+In addition, mere aggregation of another work not based on the Program
+with the Program (or with a work based on the Program) on a volume of
+a storage or distribution medium does not bring the other work under
+the scope of this License.
+
+  3. You may copy and distribute the Program (or a work based on it,
+under Section 2) in object code or executable form under the terms of
+Sections 1 and 2 above provided that you also do one of the following:
+
+    a) Accompany it with the complete corresponding machine-readable
+    source code, which must be distributed under the terms of Sections
+    1 and 2 above on a medium customarily used for software interchange; or,
+
+    b) Accompany it with a written offer, valid for at least three
+    years, to give any third party, for a charge no more than your
+    cost of physically performing source distribution, a complete
+    machine-readable copy of the corresponding source code, to be
+    distributed under the terms of Sections 1 and 2 above on a medium
+    customarily used for software interchange; or,
+
+    c) Accompany it with the information you received as to the offer
+    to distribute corresponding source code.  (This alternative is
+    allowed only for noncommercial distribution and only if you
+    received the program in object code or executable form with such
+    an offer, in accord with Subsection b above.)
+
+The source code for a work means the preferred form of the work for
+making modifications to it.  For an executable work, complete source
+code means all the source code for all modules it contains, plus any
+associated interface definition files, plus the scripts used to
+control compilation and installation of the executable.  However, as a
+special exception, the source code distributed need not include
+anything that is normally distributed (in either source or binary
+form) with the major components (compiler, kernel, and so on) of the
+operating system on which the executable runs, unless that component
+itself accompanies the executable.
+
+If distribution of executable or object code is made by offering
+access to copy from a designated place, then offering equivalent
+access to copy the source code from the same place counts as
+distribution of the source code, even though third parties are not
+compelled to copy the source along with the object code.
+
+  4. You may not copy, modify, sublicense, or distribute the Program
+except as expressly provided under this License.  Any attempt
+otherwise to copy, modify, sublicense or distribute the Program is
+void, and will automatically terminate your rights under this License.
+However, parties who have received copies, or rights, from you under
+this License will not have their licenses terminated so long as such
+parties remain in full compliance.
+
+  5. You are not required to accept this License, since you have not
+signed it.  However, nothing else grants you permission to modify or
+distribute the Program or its derivative works.  These actions are
+prohibited by law if you do not accept this License.  Therefore, by
+modifying or distributing the Program (or any work based on the
+Program), you indicate your acceptance of this License to do so, and
+all its terms and conditions for copying, distributing or modifying
+the Program or works based on it.
+
+  6. Each time you redistribute the Program (or any work based on the
+Program), the recipient automatically receives a license from the
+original licensor to copy, distribute or modify the Program subject to
+these terms and conditions.  You may not impose any further
+restrictions on the recipients' exercise of the rights granted herein.
+You are not responsible for enforcing compliance by third parties to
+this License.
+
+  7. If, as a consequence of a court judgment or allegation of patent
+infringement or for any other reason (not limited to patent issues),
+conditions are imposed on you (whether by court order, agreement or
+otherwise) that contradict the conditions of this License, they do not
+excuse you from the conditions of this License.  If you cannot
+distribute so as to satisfy simultaneously your obligations under this
+License and any other pertinent obligations, then as a consequence you
+may not distribute the Program at all.  For example, if a patent
+license would not permit royalty-free redistribution of the Program by
+all those who receive copies directly or indirectly through you, then
+the only way you could satisfy both it and this License would be to
+refrain entirely from distribution of the Program.
+
+If any portion of this section is held invalid or unenforceable under
+any particular circumstance, the balance of the section is intended to
+apply and the section as a whole is intended to apply in other
+circumstances.
+
+It is not the purpose of this section to induce you to infringe any
+patents or other property right claims or to contest validity of any
+such claims; this section has the sole purpose of protecting the
+integrity of the free software distribution system, which is
+implemented by public license practices.  Many people have made
+generous contributions to the wide range of software distributed
+through that system in reliance on consistent application of that
+system; it is up to the author/donor to decide if he or she is willing
+to distribute software through any other system and a licensee cannot
+impose that choice.
+
+This section is intended to make thoroughly clear what is believed to
+be a consequence of the rest of this License.
+
+  8. If the distribution and/or use of the Program is restricted in
+certain countries either by patents or by copyrighted interfaces, the
+original copyright holder who places the Program under this License
+may add an explicit geographical distribution limitation excluding
+those countries, so that distribution is permitted only in or among
+countries not thus excluded.  In such case, this License incorporates
+the limitation as if written in the body of this License.
+
+  9. The Free Software Foundation may publish revised and/or new versions
+of the General Public License from time to time.  Such new versions will
+be similar in spirit to the present version, but may differ in detail to
+address new problems or concerns.
+
+Each version is given a distinguishing version number.  If the Program
+specifies a version number of this License which applies to it and "any
+later version", you have the option of following the terms and conditions
+either of that version or of any later version published by the Free
+Software Foundation.  If the Program does not specify a version number of
+this License, you may choose any version ever published by the Free Software
+Foundation.
+
+  10. If you wish to incorporate parts of the Program into other free
+programs whose distribution conditions are different, write to the author
+to ask for permission.  For software which is copyrighted by the Free
+Software Foundation, write to the Free Software Foundation; we sometimes
+make exceptions for this.  Our decision will be guided by the two goals
+of preserving the free status of all derivatives of our free software and
+of promoting the sharing and reuse of software generally.
+
+                            NO WARRANTY
+
+  11. BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
+FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN
+OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED
+OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS
+TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE
+PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING,
+REPAIR OR CORRECTION.
+
+  12. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
+WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+REDISTRIBUTE THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES,
+INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING
+OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED
+TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY
+YOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER
+PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+                     END OF TERMS AND CONDITIONS
+
+            How to Apply These Terms to Your New Programs
+
+  If you develop a new program, and you want it to be of the greatest
+possible use to the public, the best way to achieve this is to make it
+free software which everyone can redistribute and change under these terms.
+
+  To do so, attach the following notices to the program.  It is safest
+to attach them to the start of each source file to most effectively
+convey the exclusion of warranty; and each file should have at least
+the "copyright" line and a pointer to where the full notice is found.
+
+    <one line to give the program's name and a brief idea of what it does.>
+    Copyright (C) <year>  <name of author>
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+Also add information on how to contact you by electronic and paper mail.
+
+If the program is interactive, make it output a short notice like this
+when it starts in an interactive mode:
+
+    Gnomovision version 69, Copyright (C) year name of author
+    Gnomovision comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+    This is free software, and you are welcome to redistribute it
+    under certain conditions; type `show c' for details.
+
+The hypothetical commands `show w' and `show c' should show the appropriate
+parts of the General Public License.  Of course, the commands you use may
+be called something other than `show w' and `show c'; they could even be
+mouse-clicks or menu items--whatever suits your program.
+
+You should also get your employer (if you work as a programmer) or your
+school, if any, to sign a "copyright disclaimer" for the program, if
+necessary.  Here is a sample; alter the names:
+
+  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+  `Gnomovision' (which makes passes at compilers) written by James Hacker.
+
+  <signature of Ty Coon>, 1 April 1989
+  Ty Coon, President of Vice
+
+This General Public License does not permit incorporating your program into
+proprietary programs.  If your program is a subroutine library, you may
+consider it more useful to permit linking proprietary applications with the
+library.  If this is what you want to do, use the GNU Lesser General
+Public License instead of this License.
+================================================================================
+
+[GPL-2.0-or-later]
+================================================================================
+The files in this package are free software; you can redistribute them
+and/or modify them under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2, or (at
+your option) any later version.
+
+The files in this package are distributed in the hope that they will
+be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+On Debian GNU/Linux systems, the complete text of the GNU General Public
+License can be found in `/usr/share/common-licenses/GPL'.
+================================================================================
+
+[GPL-3.0-or-later]
+================================================================================
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This package is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+On Debian systems, the complete text of the GNU General
+Public License version 3 can be found in "/usr/share/common-licenses/GPL-3".
+================================================================================
+
+[LicenseRef-NVIDIA-SOFTWARE-LICENSE-AGREEMENT]
+================================================================================
+NVIDIA Software License Agreement. See https://pypi.org/project/nvidia-sphinx-theme/ for terms.
+================================================================================
+
+[LicenseRef-NvidiaDesignWorksSDK]
+================================================================================
+NVIDIA DesignWorks SDK License
+
+This license is a legal agreement between you and NVIDIA Corporation ("NVIDIA") and governs the use of a NVIDIA DesignWorks software development kit made available to you under this license (the "SDK").
+
+This license can be accepted only by an adult of legal age of majority in the country in which the SDK is used. If you are under the legal age of majority, you must ask your parent or legal guardian to consent to this license. If you are entering this license on behalf of a company or other legal entity, you represent that you have legal authority and "you" will mean the entity you represent.
+
+By using the SDK, you affirm that you have reached the legal age of majority, you accept the terms of this license, and you take legal and financial responsibility for the actions of your permitted users.
+
+You agree to use the SDK only for purposes that are permitted by (a) this license, and (b) any applicable law, regulation or generally accepted practices or guidelines in the relevant jurisdictions.
+
+1. LICENSE. Subject to the terms of this license, NVIDIA hereby grants you a non-exclusive, non-transferable license, without the right to sublicense (except as expressly provided in this license) to:
+a. Install and use the SDK,
+b. Modify and create derivative works of sample source code delivered in the SDK, and
+c. Distribute any sample source code delivered in the SDK and derivative works of such sample source code, as incorporated in object code format into a software application subject to the distribution requirements indicated in this license.
+
+2. DISTRIBUTION REQUIREMENTS. These are the distribution requirements for you to exercise the grants above:
+a. An application must have material additional functionality, beyond the included portions of the SDK.
+b. The distributable portions of the SDK shall only be accessed by your application.
+c. The following notice shall be included in modifications and derivative works of source code distributed: "This software contains source code provided by NVIDIA Corporation."
+d. You agree to distribute the SDK subject to the terms at least as protective as the terms of this license, including (without limitation) terms relating to the license grant, license restrictions and protection of NVIDIA's intellectual property rights. Additionally, you agree that you will protect the privacy, security and legal rights of your application users.
+e. You agree to notify NVIDIA in writing of any known or suspected distribution or use of the SDK not in compliance with the requirements of this license, and to enforce the terms of your agreements with respect to the distributed portions of the SDK.
+
+3. AUTHORIZED USERS. You may allow employees and contractors of your entity or of your subsidiary(ies) to access and use the SDK from your secure network to perform work on your behalf. If you are an academic institution you may allow users enrolled or employed by the academic institution to access and use the SDK from your secure network. You are responsible for the compliance with the terms of this license by your authorized users.
+
+4. LIMITATIONS. Your license to use the SDK is restricted as follows:
+a. You may not reverse engineer, decompile or disassemble, or remove copyright or other proprietary notices from any portion of the SDK or copies of the SDK.
+b. Except as expressly provided in this license, you may not copy, sell, rent, sublicense, transfer, distribute, modify, or create derivative works of any portion of the SDK. For clarity, you may not distribute or sublicense the SDK as a stand-alone product.
+c. Unless you have an agreement with NVIDIA for this purpose, you may not indicate that an application created with the SDK is sponsored or endorsed by NVIDIA.
+d. You may not bypass, disable, or circumvent any technical limitation, encryption, security, digital rights management or authentication mechanism in the SDK.
+e. You may not use the SDK in any manner that would cause it to become subject to an open source software license. As examples, licenses that require as a condition of use, modification, and/or distribution that the SDK be: (i) disclosed or distributed in source code form; (ii) licensed for the purpose of making derivative works; or (iii) redistributable at no charge.
+f. You acknowledge that the SDK as delivered is not tested or certified by NVIDIA for use in connection with the design, construction, maintenance, and/or operation of any system where the use or failure of such system could result in a situation that threatens the safety of human life or results in catastrophic damages (each, a "Critical Application"). Examples of Critical Applications include use in avionics, navigation, autonomous vehicle applications, ai solutions for automotive products, military, medical, life support or other life critical applications. NVIDIA shall not be liable to you or any third party, in whole or in part, for any claims or damages arising from such uses. You are solely responsible for ensuring that any product or service developed with the SDK as a whole includes sufficient features to comply with all applicable legal and regulatory standards and requirements.
+g. You agree to defend, indemnify and hold harmless NVIDIA and its affiliates, and their respective employees, contractors, agents, officers and directors, from and against any and all claims, damages, obligations, losses, liabilities, costs or debt, fines, restitutions and expenses (including but not limited to attorney's fees and costs incident to establishing the right of indemnification) arising out of or related to products or services that use the SDK in or for Critical Applications, and for use of the SDK outside of the scope of this Agreement or not in compliance with its terms.
+
+5. UPDATES. NVIDIA may, at its option, make available patches, workarounds or other updates to this SDK. Unless the updates are provided with their separate governing terms, they are deemed part of the SDK licensed to you as provided in this license. You agree that the form and content of the SDK that NVIDIA provides may change without prior notice to you. While NVIDIA generally maintains compatibility between versions, NVIDIA may in some cases make changes that introduce incompatibilities in future versions of the SDK.
+
+6. PRE-RELEASE VERSIONS. SDK versions identified as alpha, beta, preview, early access or otherwise as pre-release may not be fully functional, may contain errors or design flaws, and may have reduced or different security, privacy, availability, and reliability standards relative to commercial versions of NVIDIA software and materials. You may use a pre-release SDK version at your own risk, understanding that these versions are not intended for use in production or business-critical systems. NVIDIA may choose not to make available a commercial version of any pre-release SDK. NVIDIA may also choose to abandon development and terminate the availability of a pre-release SDK at any time without liability.
+
+7. COMPONENTS UNDER OTHER LICENSES. The SOFTWARE may include NVIDIA or third-party components with separate legal notices or terms as may be described in proprietary notices accompanying the SOFTWARE, such as components governed by open source software licenses. If and to the extent there is a conflict between the terms in this license and the license terms associated with a component, the license terms associated with the components control only to the extent necessary to resolve the conflict.
+
+You acknowledge and agree that it is your sole responsibility to obtain any additional third-party licenses required to make, have made, use, have used, sell, import, and offer for sale your products or services that include or incorporate any third-party software and content relating to audio and/or video encoders and decoders from, including but not limited to, Microsoft, Thomson, Fraunhofer IIS, Sisvel S.p.A., MPEG-LA, and Coding Technologies. NVIDIA does not grant to you under this license any necessary patent or other rights with respect to any audio and/or video encoders and decoders.
+
+8. OWNERSHIP.
+
+8.1 NVIDIA reserves all rights, title and interest in and to the SDK not expressly granted to you under this license. NVIDIA and its suppliers hold all rights, title and interest in and to the SDK, including their respective intellectual property rights. The SDK is copyrighted and protected by the laws of the United States and other countries, and international treaty provisions.
+
+8.2 Subject to the rights of NVIDIA and its suppliers in the SDK, you hold all rights, title and interest in and to your applications and your derivative works of the sample source code delivered in the SDK including their respective intellectual property rights.
+
+9. FEEDBACK. You may, but are not obligated to, provide Feedback to NVIDIA. "Feedback" means all suggestions, fixes, modifications, feature requests or other feedback regarding the SDK. Feedback, even if designated as confidential by you, shall not create any confidentiality obligation for NVIDIA. NVIDIA and its designees have a perpetual, non-exclusive, worldwide, irrevocable license to use, reproduce, publicly display, modify, create derivative works of, license, sublicense, and otherwise distribute and exploit Feedback as NVIDIA sees fit without payment and without obligation or restriction of any kind on account of intellectual property rights or otherwise.
+
+10. NO WARRANTIES. THE SDK IS PROVIDED AS-IS. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW NVIDIA AND ITS AFFILIATES EXPRESSLY DISCLAIM ALL WARRANTIES OF ANY KIND OR NATURE, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, WARRANTIES OF MERCHANTABILITY, NON-INFRINGEMENT, OR FITNESS FOR A PARTICULAR PURPOSE. NVIDIA DOES NOT WARRANT THAT THE SDK WILL MEET YOUR REQUIREMENTS OR THAT THE OPERATION THEREOF WILL BE UNINTERRUPTED OR ERROR-FREE, OR THAT ALL ERRORS WILL BE CORRECTED.
+
+11. LIMITATIONS OF LIABILITY. TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW NVIDIA AND ITS AFFILIATES SHALL NOT BE LIABLE FOR ANY SPECIAL, INCIDENTAL, PUNITIVE OR CONSEQUENTIAL DAMAGES, OR FOR ANY LOST PROFITS, PROJECT DELAYS, LOSS OF USE, LOSS OF DATA OR LOSS OF GOODWILL, OR THE COSTS OF PROCURING SUBSTITUTE PRODUCTS, ARISING OUT OF OR IN CONNECTION WITH THIS LICENSE OR THE USE OR PERFORMANCE OF THE SDK, WHETHER SUCH LIABILITY ARISES FROM ANY CLAIM BASED UPON BREACH OF CONTRACT, BREACH OF WARRANTY, TORT (INCLUDING NEGLIGENCE), PRODUCT LIABILITY OR ANY OTHER CAUSE OF ACTION OR THEORY OF LIABILITY, EVEN IF NVIDIA HAS PREVIOUSLY BEEN ADVISED OF, OR COULD REASONABLY HAVE FORESEEN, THE POSSIBILITY OF SUCH DAMAGES. IN NO EVENT WILL NVIDIA'S AND ITS AFFILIATES TOTAL CUMULATIVE LIABILITY UNDER OR ARISING OUT OF THIS LICENSE EXCEED US$10.00. THE NATURE OF THE LIABILITY OR THE NUMBER OF CLAIMS OR SUITS SHALL NOT ENLARGE OR EXTEND THIS LIMIT.
+
+12. TERMINATION. Your rights under this license will terminate automatically without notice from NVIDIA if you fail to comply with any term and condition of this license or if you commence or participate in any legal proceeding against NVIDIA with respect to the SDK. NVIDIA may terminate this license with advance written notice to you, if NVIDIA decides to no longer provide the SDK in a country or, in NVIDIA's sole discretion, the continued use of it is no longer commercially viable. Upon any termination of this license, you agree to promptly discontinue use of the SDK and destroy all copies in your possession or control. Your prior distributions in accordance with this license are not affected by the termination of this license. All provisions of this license will survive termination, except for the license granted to you.
+
+13. APPLICABLE LAW. This license will be governed in all respects by the laws of the United States and of the State of Delaware, without regard to the conflicts of laws principles. The United Nations Convention on Contracts for the International Sale of Goods is specifically disclaimed. You agree to all terms of this license in the English language. The state or federal courts residing in Santa Clara County, California shall have exclusive jurisdiction over any dispute or claim arising out of this license. Notwithstanding this, you agree that NVIDIA shall still be allowed to apply for injunctive remedies or urgent legal relief in any jurisdiction.
+
+14. NO ASSIGNMENT. This license and your rights and obligations thereunder may not be assigned by you by any means or operation of law without NVIDIA's permission. Any attempted assignment not approved by NVIDIA in writing shall be void and of no effect. NVIDIA may assign, delegate or transfer this license and its rights and obligations.
+
+15. EXPORT. The SDK is subject to United States export laws and regulations. You agree to comply with all applicable U.S. and international export laws, including the Export Administration Regulations (EAR) administered by the U.S. Department of Commerce and economic sanctions administered by the U.S. Department of Treasury's Office of Foreign Assets Control (OFAC). These laws include restrictions on destinations, end-users and end-use. By accepting this license, you confirm that you are not currently residing in a country or region currently embargoed by the U.S. and that you are not otherwise prohibited from receiving the SDK.
+
+16. GOVERNMENT USE. The SDK is, and shall be treated as being, "Commercial Items" as that term is defined at 48 CFR § 2.101, consisting of "commercial computer software" and "commercial computer software documentation", respectively, as such terms are used in, respectively, 48 CFR § 12.212 and 48 CFR §§ 227.7202 & 252.227-7014(a)(1). Use, duplication or disclosure by the U.S. Government or a U.S. Government subcontractor is subject to the restrictions in this license pursuant to 48 CFR § 12.212 or 48 CFR § 227.7202. In no event shall the US Government user acquire rights in the SDK beyond those specified in 48 C.F.R. 52.227-19(b)(1)-(2).
+
+17. NOTICES. You agree that any notices that NVIDIA sends you electronically, such as via email, will satisfy any legal communication requirements. Please direct your legal notices or other correspondence to NVIDIA Corporation, 2788 San Tomas Expressway, Santa Clara, California 95051, United States of America, Attention: Legal Department.
+
+18. ENTIRE AGREEMENT. This license is the final, complete and exclusive agreement between the parties relating to the subject matter of this license and supersedes all prior or contemporaneous understandings and agreements relating to this subject matter, whether oral or written. If any court of competent jurisdiction determines that any provision of this license is illegal, invalid or unenforceable, the remaining provisions will remain in full force and effect. Any amendment or waiver under this license shall be in writing and signed by representatives of both parties.
+
+(v. May 10, 2022)
+================================================================================
+
+[MIT]
+================================================================================
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+================================================================================
+
+[NVIDIA-Community-License]
+================================================================================
+NVIDIA Community License
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION ON NVIDIA PLATFORMS
+
+The NVIDIA Works released under this License are intended to be used to enable the further development of AI and robotics technologies. Such Works have been designed, tested and optimized for use on NVIDIA Platforms, and the License grants permission to use the Works solely on such platforms.
+
+Subject to the terms of this License, NVIDIA confirms that:
+
+* Works are commercially usable.
+
+* You may create and distribute Derivative Works.
+
+* NVIDIA does not claim ownership to any outputs generated using the Works or Derivative Works.
+
+By using, reproducing, modifying, distributing, performing or displaying any portion or element of the Works or Derivative Works, or otherwise accepting the terms of this License, you agree to be bound by this License.
+
+1. Definitions.
+
+"License" shall mean the terms and conditions for use, reproduction, and distribution as defined by Sections 1 through 10 of this document.
+
+"Legal Entity" shall mean the union of the acting entity and all other entities that control, are controlled by, or are under common control with that entity. For the purposes of this definition, "control" means (i) the power, direct or indirect, to cause the direction or management of such entity, whether by contract or otherwise, or (ii) ownership of fifty percent (50%) or more of the outstanding shares, or (iii) beneficial ownership of such entity.
+
+"You" (or "Your") shall mean an individual or Legal Entity exercising permissions granted by this License.
+
+"Work" shall mean the work of authorship, software (including binary code and source code), configuration files and documentation, made available under the License, as indicated by a copyright notice that is included in or attached to the work (an example is provided in the Appendix below).
+
+"Derivative Works" shall mean any work, whether in source or object form, that is based on (or derived from) the Work and for which the editorial revisions, annotations, elaborations, or other modifications represent, as a whole, an original work of authorship. For the purposes of this License, Derivative Works shall not include works that remain separable from, or merely link (or bind by name) to the interfaces of, the Work and Derivative Works thereof.
+
+2. Grant of License. Subject to the terms and conditions of this License, NVIDIA hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable license to use, reproduce, prepare Derivative Works of, publicly display, publicly perform, sublicense (through multiple tiers), and distribute the Work and such Derivative Works in source or object form solely on systems with NVIDIA GPUs or CPUs, or for networking a system with NVIDIA HCAs (collectively, "NVIDIA Platforms").
+
+If You institute patent or copyright litigation against any entity (including a cross-claim or counterclaim in a lawsuit) alleging that the Work or an output from the Work constitutes direct or contributory patent or copyright infringement, then any licenses granted to You under this License for that Work shall terminate as of the date such litigation is filed.
+
+3. Redistribution. You may reproduce and distribute copies of the Work or Derivative Works thereof in any medium, with or without modifications, and in source or object form, provided that You meet the following conditions:
+
+    a. You must give any other recipients of the Work or Derivative Works a copy of this License; and
+
+    b. You must retain, in the source form of any Derivative Works that You distribute, all copyright, patent, trademark, and attribution notices from the source form of the Work, excluding those notices that do not pertain to any part of the Derivative Works; and
+
+    c. If the Work includes a "NOTICE" text file as part of its distribution, then any Derivative Works that You distribute must include a readable copy of the following attribution notice within a "Notice" text file with such copies and the following statement: "Licensed by NVIDIA Corporation under the NVIDIA Community License."
+
+You may add Your own copyright statement to Your modifications and may provide additional or different license terms and conditions for use, reproduction, or distribution of Your modifications, or for any such Derivative Works as a whole, provided Your use, reproduction, and distribution of the Work otherwise complies with the conditions stated in this License.
+
+4. Trademarks. This License does not grant permission to use the trade names, trademarks, service marks, or product names of NVIDIA, except as required for reasonable and customary use in describing the origin of the Work and reproducing the content of the NOTICE file.
+
+5. Disclaimer of Warranty. Unless required by applicable law or agreed to in writing, NVIDIA provides the Work on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You are solely responsible for determining the appropriateness of using or redistributing the Work and assume any risks associated with Your exercise of permissions under this License.
+
+6. Limitation of Liability. In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall NVIDIA be liable to You for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising as a result of this License or out of the use or inability to use the Work, a Derivative Work or an output from the Work or Derivative Work (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if NVIDIA has been advised of the possibility of such damages.
+
+7. Accepting Warranty or Additional Liability. While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this License. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of NVIDIA, and only if You agree to indemnify, defend, and hold NVIDIA harmless for any liability incurred by, or claims asserted against, NVIDIA by reason of your accepting any such warranty or additional liability. You will indemnify and hold harmless NVIDIA from and against any claim by any third party arising out of or related to your use or distribution of the Works, Derivative Works thereof, or output from the Works or Derivative Works.
+
+8. Feedback. NVIDIA appreciates your feedback, including any suggestions, requests, fixes, code contributions, modifications, and enhancements, and You agree that NVIDIA may use it without restriction or compensation to You.
+
+9. Governing Law. This Agreement will be governed in all respects by the laws of the United States and the laws of the State of Delaware, without regard to conflict of laws principles or the United Nations Convention on Contracts for the International Sale of Goods. The state and federal courts residing in Santa Clara County, California will have exclusive jurisdiction over any dispute or claim arising out of or related to this Agreement, and the parties irrevocably consent to personal jurisdiction and venue in those courts; except that, either party may apply for injunctive remedies or an equivalent type of urgent legal relief in any jurisdiction.
+
+10. Trade and Compliance. You agree to comply with all applicable export, import, trade and economic sanctions laws and regulations, as amended, including without limitation U.S. Export Administration Regulations and Office of Foreign Assets Control regulations. These laws include restrictions on destinations, end-users and end-use.
+
+(v. February 25, 2026)
+
+END OF TERMS AND CONDITIONS
+================================================================================

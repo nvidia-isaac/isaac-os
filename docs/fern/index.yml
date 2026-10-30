@@ -1,0 +1,189 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+navigation:
+  - section: Home
+    skip-slug: true
+    contents:
+      - page: Overview
+        path: ../overview.mdx
+        slug: overview
+      - page: ✨ For agents
+        path: ../for_agents.mdx
+        slug: for-agents
+
+  - section: Tutorials
+    slug: tutorials
+    contents:
+      - page: Getting started
+        path: ../tutorials/getting_started.mdx
+        slug: getting-started
+      - section: SO-101 reach task
+        slug: so101-reach
+        contents:
+          - page: "Part 1: Training"
+            path: ../tutorials/so101_reach/training.mdx
+            slug: training
+          - page: "Part 2: Simulation"
+            path: ../tutorials/so101_reach/simulation.mdx
+            slug: simulation
+          - page: "Part 3: Deployment"
+            path: ../tutorials/so101_reach/deployment.mdx
+            slug: deployment
+          - page: "Part 4: Benchmark"
+            path: ../tutorials/so101_reach/benchmark.mdx
+            slug: benchmark
+      - section: "GR00T N and whole-body control"
+        slug: gr00t-wbc
+        path: ../tutorials/gr00t_wbc.mdx
+        contents:
+          - page: "Simulation"
+            path: ../tutorials/gr00t_wbc/simulation.mdx
+            slug: simulation
+          - page: "Real robot"
+            path: ../tutorials/gr00t_wbc/real_robot.mdx
+            slug: real-robot
+
+  - section: How-to guides
+    slug: how-to
+    contents:
+      - section: Setup
+        skip-slug: true
+        contents:
+          - page: Build and run
+            path: ../how-to/build_and_run.mdx
+            slug: build-and-run
+          - page: Manage model downloads
+            path: ../how-to/model_downloads.mdx
+            slug: model-downloads
+          - page: Set up Isaac Sim
+            path: ../how-to/set_up_isaac_sim.mdx
+            slug: set-up-isaac-sim
+          - page: Set up an HSB camera for SIPL
+            path: ../how-to/set_up_an_hsb_camera_for_sipl.mdx
+            slug: set-up-an-hsb-camera-for-sipl
+      - section: Adapt
+        skip-slug: true
+        contents:
+          - page: Integrate in your project
+            path: ../how-to/integrate_in_your_project.mdx
+            slug: integrate-in-your-project
+          - page: Add a robot embodiment
+            path: ../how-to/add_a_robot_embodiment.mdx
+            slug: add-a-robot-embodiment
+          - page: Deploy a learned policy
+            path: ../how-to/deploy_a_learned_policy.mdx
+            slug: deploy-a-learned-policy
+          - page: Exchange Messages with ROS 2
+            path: ../how-to/connect_a_ros_2_graph.mdx
+            slug: connect-a-ros-2-graph
+      - section: Inspect
+        skip-slug: true
+        contents:
+          - page: Record data and view it in Foxglove
+            path: ../how-to/record_and_inspect_data_with_mcap_and_foxglove.mdx
+            slug: record-and-inspect-data-with-mcap-and-foxglove
+          - page: Replay a recording into a graph
+            path: ../how-to/replay_a_recording_into_a_graph.mdx
+            slug: replay-a-recording-into-a-graph
+      - section: Optimize
+        skip-slug: true
+        contents:
+          - page: Optimize your host
+            path: ../how-to/optimize_your_host.mdx
+            slug: optimize-your-host
+          - page: Profile an Application
+            path: ../how-to/profile_an_application.mdx
+            slug: profile-an-application
+          - page: Optimize an Application
+            path: ../how-to/optimize_an_application.mdx
+            slug: optimize-an-application
+      - section: Deploy
+        skip-slug: true
+        contents:
+          - page: "Deploy on Thor with Yocto"
+            path: ../how-to/deploy_on_thor_with_yocto.mdx
+            slug: deploy-on-thor-with-yocto
+
+  - section: Explanation
+    slug: explanation
+    contents:
+      - page: Isaac OS concepts
+        path: ../explanation/isaac_os_basics.mdx
+        slug: isaac-os-basics
+      - page: Isaac OS and ROS 2
+        path: ../explanation/isaac_os_and_ros_2.mdx
+        slug: isaac-os-and-ros-2
+      - page: Application modes
+        path: ../explanation/application_modes.mdx
+        slug: application-modes
+
+  - section: Reference
+    slug: reference
+    contents:
+      - section: Applications
+        slug: applications
+        contents:
+          - page: Robot Control Benchmark
+            path: ../applications/robot_control_benchmark.mdx
+            slug: robot-control-benchmark
+          - section: Robot controllers
+            skip-slug: true
+            contents:
+              - section: SO-101 Sinus Motion
+                skip-slug: true
+                contents:
+                  - page: Overview
+                    path: ../applications/so101_sinus_motion.mdx
+                    slug: so101-sinus-motion
+                  - page: Benchmark
+                    path: ../applications/so101_sinus_motion/benchmark.mdx
+                    slug: so101-sinus-motion/benchmark
+              - page: SO-101 Reach
+                path: ../applications/so101_reach.mdx
+                slug: so101-reach
+              - page: Unitree G1 WBC
+                path: ../applications/wbc_g1.mdx
+                slug: wbc-g1
+              - section: Unitree G1 GR00T N1.7 and WBC
+                skip-slug: true
+                contents:
+                  - page: Overview
+                    path: ../applications/gr00t_n1_7_wbc_g1.mdx
+                    slug: gr00t-n1-7-wbc-g1
+                  - page: Benchmark
+                    path: ../applications/gr00t_n1_7_wbc_g1/benchmark.mdx
+                    slug: gr00t-n1-7-wbc-g1/benchmark
+          - section: Feature examples
+            skip-slug: true
+            contents:
+              - page: SIPL Camera
+                path: ../applications/sipl_camera.mdx
+                slug: sipl-camera
+              - page: cuVSLAM on VB1940
+                path: ../applications/cuvslam_vb1940.mdx
+                slug: cuvslam-vb1940
+              - page: ROS 2 Bridge
+                path: ../applications/ros2_bridge_reference.mdx
+                slug: ros2-bridge-reference
+              - page: MCAP Logger
+                path: ../applications/mcap_logger_reference.mdx
+                slug: mcap-logger-reference
+              - page: MCAP Replay
+                path: ../applications/mcap_replay_reference.mdx
+                slug: mcap-replay-reference
+      - section: Platforms
+        skip-slug: true
+        contents:
+          - page: Support matrix
+            path: ../reference/supported_platforms.mdx
+            slug: platforms
+          - page: System configuration
+            path: ../reference/system_configuration.mdx
+            slug: platforms/system-configuration
+      - page: Components
+        path: ../reference/components.mdx
+        slug: components
+      - page: Isaac OS CLI
+        path: ../reference/cli.mdx
+        slug: cli

@@ -1,0 +1,79 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Support matrix
+
+<Tabs>
+
+<Tab title="Deployment" id="deployment-platforms">
+
+<Success>
+
+##### [Jetson AGX Thor](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-thor/)
+
+- Validated on **JetPack 7.2.1**.
+- For CPU/GPU tuning, see [Optimize your host](/isaac-os/how-to/optimize-your-host).
+- For the benchmark reference settings, see [System configuration](/isaac-os/reference/platforms/system-configuration).
+
+</Success>
+
+<Note>
+
+##### [IGX Thor Mini (5000)](https://www.nvidia.com/en-us/edge-computing/products/igx/)
+
+- Support expected in Q1 2027 with **IGX OS 2.1**.
+
+</Note>
+
+<Info>
+
+##### [Jetson AGX Orin](https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/)
+
+- **Untested**. Expected to work with **JetPack 7.x**.
+- NVIDIA Video Codec SDK support is unavailable on Orin. This means
+no NVENC encoding of image streams as H.264/H.265 for
+[MCAP recording](/isaac-os/how-to/record-and-inspect-data-with-mcap-and-foxglove)
+or NVDEC decoding of those streams during
+[replay](/isaac-os/how-to/replay-a-recording-into-a-graph).
+- No [SIPL](https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/CameraDevelopment/SIPLFramework/SIPLFramework.html)
+support. This means no HSB low-latency camera support such as the
+[Leopard Eagle VB1940 reference camera](/isaac-os/how-to/set-up-an-hsb-camera-for-sipl).
+
+</Info>
+
+<Info title="x86_64">
+
+- **Untested**. Expected to work on Linux with **NVIDIA driver 595 or newer** (CUDA 13.2). Older drivers can work through [CUDA forward compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/forward-compatibility.html), as set up in NVIDIA containers. Performance will vary based on system specifications.
+- No [SIPL](https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/SD/CameraDevelopment/SIPLFramework/SIPLFramework.html)
+support. This means no HSB low-latency camera support such as the
+[Leopard Eagle VB1940 reference camera](/isaac-os/how-to/set-up-an-hsb-camera-for-sipl).
+
+</Info>
+
+</Tab>
+
+<Tab title="Simulation" id="simulation-platforms">
+
+<Success title="x86_64">
+
+- Supports Isaac Sim and the Isaac OS application running on the same host.
+- Check the
+[Isaac Sim 6.2 requirements](https://docs.isaacsim.omniverse.nvidia.com/6.2.0/installation/requirements.html)
+for GPU, driver and system requirements.
+- Follow
+[Set up Isaac Sim](/isaac-os/how-to/set-up-isaac-sim).
+
+</Success>
+
+<Note title="Distributed systems">
+
+- **Not formally tested**. Expected to work with Isaac Sim on x86_64 and an Isaac OS application on AGX or IGX over Ethernet, including on
+[OSMO-compatible clusters](https://developer.nvidia.com/osmo). Performance will vary based on system and network specifications.
+
+</Note>
+
+</Tab>
+
+</Tabs>

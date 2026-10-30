@@ -1,0 +1,186 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# GR00T N and whole-body control - Simulation
+
+<Note>
+Load compatible static-apple ONNX models produced by LEAPP export into Isaac OS,
+connect to Isaac Sim, and watch the G1 lift an apple and release it onto a plate.
+Finish by resetting the scene for another attempt.
+
+As of Isaac OS v0.11, only the bundled simulation model is supported. Other GR00T
+exports, including your own LEAPP exports, are not supported yet.
+</Note>
+
+## Before you start
+
+### Check your host
+
+Complete [Check your host](/isaac-os/tutorials/getting-started#check-your-host)
+in Getting started. For this simulation path, use a Linux x86_64 workstation
+that also meets the
+[Isaac Sim requirements](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/requirements.html).
+Run the simulator and controller on the same workstation, with a desktop display
+to observe the task and network access to download scene assets.
+
+### Prepare your source checkout
+
+Follow [Fetch the reference source code](/isaac-os/tutorials/getting-started#fetch-the-reference-source-code)
+if you do not already have an Isaac OS checkout. Complete the
+[sample app run](/isaac-os/tutorials/getting-started#run-a-sample-app) to check the
+shared build-and-run setup; it should exit after 100 commands.
+
+Open two terminals at the Isaac OS repository root and run the following steps
+there. [Isaac Sim setup](/isaac-os/how-to/set-up-isaac-sim) covers display and
+cache configuration.
+
+### Use the bundled ONNX models
+
+The build downloads the bundled static-apple models: five ONNX models and their
+external weight files, with a 40-step decoded action horizon. Do not export a new
+policy for this tutorial. Isaac OS loads ONNX using its own model YAML; it does not
+ingest LEAPP metadata. The
+[model handoff contract](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#model-export-contract)
+lists the interfaces and joint mappings.
+
+
+
+## 1. Build the controller
+
+In terminal 2:
+
+```bash
+./isaac_os build gr00t_n1_7_wbc_g1
+```
+
+Wait for the build to finish successfully. The first build obtains the container,
+dependencies, WBC policy and cached GR00T N models. At launch, the bundled models
+you copy next replace the cached GR00T N model paths; WBC continues using the downloaded policy.
+
+## 2. Copy the bundled models
+
+In terminal 2, copy the bundled models and their model YAML:
+
+```bash
+mkdir -p deployment/gr00t-sim/policy
+./isaac_os run-container -- cp -aL \
+  data/gr00t_n1_7/g1_static_apple_sim/. deployment/gr00t-sim/policy/
+cp operators/gr00t_n1_7/config/n1_7_g1_apple_sim_trt.yaml \
+  deployment/gr00t-sim/model.yaml
+```
+
+Run this after the build, using the same cache mounts. Copying inside the
+container resolves the cached model symlinks.
+
+Keep external-data files beside their ONNX models, with their original names.
+Keep these files outside the build-managed `data/` directories.
+
+In `deployment/gr00t-sim/model.yaml`, replace the directory prefix
+`data/gr00t_n1_7/g1_static_apple_sim/` in all five `gr00t_n1_7.models[].path`
+entries with `deployment/gr00t-sim/policy/`. The paths should now be:
+
+```text
+deployment/gr00t-sim/policy/preprocess_video.onnx
+deployment/gr00t-sim/policy/preprocess_state.onnx
+deployment/gr00t-sim/policy/backbone.onnx
+deployment/gr00t-sim/policy/action_head.onnx
+deployment/gr00t-sim/policy/decode_action.onnx
+```
+
+Leave the bindings unchanged. All paths resolve from
+the repository root, which is mounted inside the application container.
+`--model-config-path` below selects `deployment/gr00t-sim/model.yaml`.
+
+## 3. Start the apple scene
+
+In terminal 1:
+
+```bash
+./isaac_sim run \
+  --scene operators/unitree_g1/assets/g1_static_apple_ucx.usda \
+  -- \
+  --substeps 4
+```
+
+Accept the Isaac Sim EULA when prompted. The first launch can take several minutes
+while assets load and shaders compile. Keep the initial robot and object poses.
+Leave terminal 1 running. The four physics substeps give this scene its 50 Hz
+control rate. No separate policy server or Isaac Lab process is needed.
+
+## 4. Run the policy
+
+In terminal 2:
+
+```bash
+./isaac_os run gr00t_n1_7_wbc_g1 sim -- \
+  --model-config-path=deployment/gr00t-sim/model.yaml
+```
+
+The first launch builds TensorRT engines for the GR00T N models and WBC, which can take
+several minutes. Wait for inference initialization and the UCX connection. The
+simulator then starts stepping. Startup hands the upper body to GR00T N
+automatically; no keyboard or gamepad enables are required in this exercise.
+Leave locomotion at zero.
+
+<Accordion title="📄 Readiness messages">
+
+The controller reports `accelerated inference is ready.` and
+`Connected to the UCX peer at 127.0.0.1:50008.`. Terminal 1 reports
+`UCX client connected - starting simulation.`.
+
+</Accordion>
+
+<Accordion title="⚠️ The controller does not start or connect">
+
+For missing model files, check the five paths and the ONNX external-data files
+under `deployment/gr00t-sim/policy/`. For binding or shape errors, compare the
+export with the simulation model contract before retrying.
+
+For a connection failure, check that terminal 1 is waiting on port `50008` and
+that no other controller is connected. On a host with multiple interfaces, see
+[UCX connection troubleshooting](/isaac-os/how-to/set-up-isaac-sim#connecting-an-application).
+
+If startup reports an unsupported CUDA Green Context allocation, append
+`--green-context-wbc-sms=0` to the controller command to disable partitioning.
+This still requires a CUDA GPU and can change performance.
+
+</Accordion>
+
+## 5. Observe pickup and placement
+
+Watch the Isaac Sim viewport. A successful attempt has two observable outcomes:
+the G1 lifts the apple clear of the table, then releases it onto the plate.
+Inference readiness or a scene reset does not establish task success.
+The policy continues after placement and may move the apple again.
+
+<Accordion title="⚠️ The robot does not complete the task">
+
+Verify the simulation model configuration, the original apple scene, and
+`--substeps 4`. Keep the robot and objects at their initial poses and leave
+locomotion at zero. Inspect both terminals for camera, inference or simulator
+errors. Use a fresh episode for the next attempt.
+
+</Accordion>
+
+## 6. Stop and repeat
+
+Press **Ctrl+C in terminal 2** and wait for the controller to exit. Isaac Sim
+resets the scene. Repeat step 4 for another attempt; the controller can start
+while Isaac Sim resets.
+Restart the controller for every episode; do not reset the scene underneath a
+running controller. When finished, stop the controller first, then press
+**Ctrl+C in terminal 1** to stop Isaac Sim.
+
+<Accordion title="❓ How can I compare attempts?">
+
+Record the Isaac OS commit (`git rev-parse HEAD`), model identity, configuration,
+and pickup and placement outcomes. Keep the observation duration consistent in
+simulation time. Record any later movement off the plate separately; it does not
+undo an earlier successful placement.
+
+</Accordion>
+
+For a separate deployment path requiring a physical-G1 export and hardware,
+see [Real robot](/isaac-os/tutorials/gr00t-wbc/real-robot).

@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+rate: 1000.0
+target_rate: 137.0
+# Shared CPU assignments for CPU and GPU campaigns.
+target_cpu: 12
+control_cpu: 13
+pump_cpu: 11
+# GPU contention thread, active only in the contended and isolated scenarios (SCHED_OTHER).
+load_cpu: 10
+# The measured control partition always uses SCHED_FIFO.
+control_fifo_priority: 10
+samples: 20000
+warmup: 1000
+timeout: 60
+scenario: clean
+# cpu-ik or gpu-ik
+motion_backend: cpu-ik
+iceoryx2_prefix: ""
+label_prefix: isaac-os-robot-control

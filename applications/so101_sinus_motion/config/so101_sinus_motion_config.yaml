@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Joint-state source and command path run at 100 Hz. The sine generator and
+# motion planner tick on each state sample.
+state_source:
+  period: 0.01
+
+sinus_motion_op:
+  default_pos: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  num_joints: 6
+  sin_amplitude: 0.20
+  sin_frequency: 0.25
+
+motion_planner_op:
+  max_step_size: 0.20
+  num_motors: 6
+
+real_robot:
+  serial_port: "/dev/ttyACM0"
+  calibration_file: "PLACEHOLDER_PATH_TO_FOLLOWER_CALIBRATION_FILE.json"
+  run_speed: 1500
+  run_acceleration: 60
+  position_p_gain: 16
+  position_i_gain: 0
+  position_d_gain: 32
+  # Start at the sine mean; gripper zero is its calibrated closed endpoint.
+  home_position: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

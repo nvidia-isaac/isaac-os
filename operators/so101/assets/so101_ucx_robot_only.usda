@@ -1,0 +1,319 @@
+#usda 1.0
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+(
+    customLayerData = {
+        dictionary omni_layer = {
+            string authoring_layer = "./so101_ucx_robot_only.usda"
+        }
+    }
+    defaultPrim = "so101_new_calib"
+    metersPerUnit = 1
+    upAxis = "Z"
+    # A nonzero timeline range lets simulation time advance during playback.
+    startTimeCode = 0
+    endTimeCode = 1000000
+)
+
+def Xform "so101_new_calib" (
+    references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Robots_Multiphysics/RobotStudio/so101_new_calib_SysID/so101_new_calib.usda@
+    variants = {
+        string Physics = "physx"
+        string Robot = "robot"
+        string Sensor = "sensors"
+    }
+)
+{
+    over "gripper"
+    {
+        over "wowrobo_2MP_camera"
+        {
+            float omni:sensor:tickRate = 60
+        }
+    }
+
+    def OmniGraph "ActionGraph"
+    {
+        token evaluationMode = "Automatic"
+        token evaluator:type = "execution"
+        token fabricCacheBacking = "StageWithoutHistory"
+        int2 fileFormatVersion = (1, 9)
+        token pipelineStage = "pipelineStageSimulation"
+
+        def OmniGraphNode "on_playback_tick" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            token node:type = "omni.graph.action.OnPlaybackTick"
+            int node:typeVersion = 2
+            custom double outputs:deltaSeconds
+            custom double outputs:frame
+            custom uint outputs:tick (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom double outputs:time
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2960.879, -15.046741)
+        }
+
+        def OmniGraphNode "isaac_read_joint_state_node" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </so101_new_calib/ActionGraph/on_playback_tick.outputs:tick>
+            custom rel inputs:prim = </so101_new_calib/root_joint> (
+                customData = {
+                    dictionary omni = {
+                        dictionary graph = {
+                            string relType = "target"
+                        }
+                    }
+                }
+            )
+            token node:type = "isaacsim.sensors.physics.IsaacReadJointState"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom uchar[] outputs:jointDofTypes
+            custom double[] outputs:jointEfforts
+            custom token[] outputs:jointNames
+            custom double[] outputs:jointPositions
+            custom double[] outputs:jointVelocities
+            custom float outputs:sensorTime
+            custom float outputs:stageMetersPerUnit
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2698.0876, -15.874884)
+        }
+
+        def OmniGraphNode "ucx_publish_joint_state" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </so101_new_calib/ActionGraph/isaac_read_joint_state_node.outputs:execOut>
+            custom double[] inputs:jointEfforts
+            prepend double[] inputs:jointEfforts.connect = </so101_new_calib/ActionGraph/isaac_read_joint_state_node.outputs:jointEfforts>
+            custom double[] inputs:jointPositions
+            prepend double[] inputs:jointPositions.connect = </so101_new_calib/ActionGraph/isaac_read_joint_state_node.outputs:jointPositions>
+            custom double[] inputs:jointVelocities
+            prepend double[] inputs:jointVelocities.connect = </so101_new_calib/ActionGraph/isaac_read_joint_state_node.outputs:jointVelocities>
+            # inputs:port is overridden by isaac_sim_ucx.py at stage-load
+            # time (see _set_ucx_port) so every UCX node matches the launcher's
+            # --port.  Leave it unset here so the USDA is port-agnostic.
+            custom uint inputs:port
+            custom uint64 inputs:tag
+            # Workaround: the OGN default (0) causes immediate send-side timeout. UINT32_MAX
+            # is the sentinel for "wait indefinitely". Remove once Isaac Sim's default is fixed.
+            custom uint inputs:timeoutMs = 4294967295
+            custom double inputs:timeStamp
+            prepend double inputs:timeStamp.connect = </so101_new_calib/ActionGraph/isaac_read_simulation_time.outputs:simulationTime>
+            token node:type = "isaacsim.ucx.nodes.UCXPublishJointState"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2432.5066, -15.09596)
+        }
+
+        def OmniGraphNode "ucx_publish_clock" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </so101_new_calib/ActionGraph/ucx_publish_joint_state.outputs:execOut>
+            # inputs:port is overridden by isaac_sim_ucx.py at stage-load
+            # time (see _set_ucx_port) so every UCX node matches the launcher's
+            # --port.  Leave it unset here so the USDA is port-agnostic.
+            custom uint inputs:port
+            custom uint64 inputs:tag
+            # Workaround: the OGN default (0) causes immediate send-side timeout. UINT32_MAX
+            # is the sentinel for "wait indefinitely". Remove once Isaac Sim's default is fixed.
+            custom uint inputs:timeoutMs = 4294967295
+            custom double inputs:timeStamp
+            prepend double inputs:timeStamp.connect = </so101_new_calib/ActionGraph/isaac_read_simulation_time.outputs:simulationTime>
+            token node:type = "isaacsim.ucx.nodes.UCXPublishClock"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2183.5342, -17.40608)
+        }
+
+        def OmniGraphNode "ucx_subscribe_joint_command" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </so101_new_calib/ActionGraph/ucx_publish_clock.outputs:execOut>
+            # inputs:port is overridden by isaac_sim_ucx.py at stage-load
+            # time (see _set_ucx_port) so every UCX node matches the launcher's
+            # --port.  Leave it unset here so the USDA is port-agnostic.
+            custom uint inputs:port
+            custom uint64 inputs:tag
+            # Workaround: the OGN default (0) causes immediate send-side timeout. UINT32_MAX
+            # is the sentinel for "wait indefinitely". Remove once Isaac Sim's default is fixed.
+            custom uint inputs:timeoutMs = 4294967295
+            token node:type = "isaacsim.ucx.nodes.UCXSubscribeJointCommand"
+            int node:typeVersion = 1
+            custom double[] outputs:effortCommand
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom double[] outputs:positionCommand
+            custom double outputs:timeStamp
+            custom double[] outputs:velocityCommand
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-1962.7856, -22.032837)
+        }
+
+        def OmniGraphNode "articulation_controller" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom double[] inputs:effortCommand
+            prepend double[] inputs:effortCommand.connect = </so101_new_calib/ActionGraph/ucx_subscribe_joint_command.outputs:effortCommand>
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </so101_new_calib/ActionGraph/ucx_subscribe_joint_command.outputs:execOut>
+            custom int[] inputs:jointIndices
+            custom token[] inputs:jointNames
+            prepend token[] inputs:jointNames.connect = </so101_new_calib/ActionGraph/isaac_read_joint_state_node.outputs:jointNames>
+            custom double[] inputs:positionCommand
+            prepend double[] inputs:positionCommand.connect = </so101_new_calib/ActionGraph/ucx_subscribe_joint_command.outputs:positionCommand>
+            custom string inputs:robotPath
+            custom rel inputs:targetPrim = </so101_new_calib/root_joint> (
+                customData = {
+                    dictionary omni = {
+                        dictionary graph = {
+                            string relType = "target"
+                        }
+                    }
+                }
+            )
+            custom double[] inputs:velocityCommand
+            prepend double[] inputs:velocityCommand.connect = </so101_new_calib/ActionGraph/ucx_subscribe_joint_command.outputs:velocityCommand>
+            token node:type = "isaacsim.core.nodes.IsaacArticulationController"
+            int node:typeVersion = 1
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-1678.377, -14.173586)
+        }
+
+        def OmniGraphNode "isaac_read_simulation_time" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint64 inputs:referenceTimeDenominator
+            custom int64 inputs:referenceTimeNumerator
+            custom bool inputs:resetOnStop
+            token node:type = "isaacsim.core.nodes.IsaacReadSimulationTime"
+            int node:typeVersion = 1
+            custom double outputs:simulationTime
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2959.0342, 148.9259)
+        }
+
+        def OmniGraphNode "isaac_create_render_product" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </so101_new_calib/ActionGraph/on_playback_tick.outputs:tick>
+            custom rel inputs:cameraPrim = </so101_new_calib/gripper/wowrobo_2MP_camera> (
+                customData = {
+                    dictionary omni = {
+                        dictionary graph = {
+                            string relType = "target"
+                        }
+                    }
+                }
+            )
+            custom uint inputs:width = 640
+            custom uint inputs:height = 480
+            custom bool inputs:enabled = 1
+            token node:type = "isaacsim.core.nodes.IsaacCreateRenderProduct"
+            int node:typeVersion = 3
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom token outputs:renderProductPath
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2959.0342, 250)
+        }
+
+        def OmniGraphNode "ucx_camera_helper" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom bool inputs:sendCudaBuffer = 1
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </so101_new_calib/ActionGraph/isaac_create_render_product.outputs:execOut>
+            # inputs:port is overridden by isaac_sim_ucx.py at stage-load
+            # time (see _set_ucx_port) so every UCX node matches the launcher's
+            # --port.  Leave it unset here so the USDA is port-agnostic.
+            custom uint64 inputs:port
+            custom token inputs:renderProductPath
+            prepend token inputs:renderProductPath.connect = </so101_new_calib/ActionGraph/isaac_create_render_product.outputs:renderProductPath>
+            custom bool inputs:resetSimulationTimeOnStop = 1
+            # UCXCameraHelper's OGN default tag is the literal value 10. Override it with
+            # FNV-1a("isaac.Image") so the camera tag follows the same hash convention as the
+            # joint state / joint command / clock tags (which use the OGN defaults).
+            custom uint64 inputs:tag = 270059627
+            custom bool inputs:useSystemTime = 0
+            token node:type = "isaacsim.ucx.nodes.UCXCameraHelper"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2959.0342, 320)
+        }
+    }
+
+}

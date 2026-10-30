@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+add_executable(test_nv_video_encoder
+  test_nv_video_encoder.cpp
+)
+
+include(isaac_deps/gtest)
+target_link_libraries(test_nv_video_encoder
+  PRIVATE
+    GTest::gtest
+    GTest::gtest_main
+    isaac::common::nv_video_encoder
+)
+
+add_test(NAME test_nv_video_encoder COMMAND test_nv_video_encoder)
+set_tests_properties(test_nv_video_encoder PROPERTIES LABELS "codec;cpp;gpu")

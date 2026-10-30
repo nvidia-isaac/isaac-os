@@ -1,0 +1,56 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "run",
+    "description": "Displays one or two VB1940 cameras through Holoscan Camera SIPL and Holoviz.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "run": {
+        "description": "Display the first camera from the attached VB1940 rig.",
+        "run": {
+          "command": "<isaac_app_bin>/sipl_camera --json-config=common/sipl/config/vb1940_single.json",
+          "workdir": "isaac_root"
+        }
+      },
+      "stereo": {
+        "description": "Display both synchronized cameras from the attached VB1940 rig side by side.",
+        "run": {
+          "command": "<isaac_app_bin>/sipl_camera --stereo --json-config=common/sipl/config/vb1940_stereo.json",
+          "workdir": "isaac_root"
+        }
+      },
+      "stereo_nosync": {
+        "description": "Display both unsynchronized cameras from the attached VB1940 rig side by side.",
+        "run": {
+          "command": "<isaac_app_bin>/sipl_camera --stereo --json-config=common/sipl/config/vb1940_stereo_nosync.json",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "sipl_camera",
+    "platforms": [
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "tags": [
+      "camera",
+      "example",
+      "reference",
+      "sipl"
+    ],
+    "version": "0.1.0"
+  }
+}

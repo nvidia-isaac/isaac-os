@@ -1,0 +1,262 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Configuration for the Unitree G1 WBC MLP locomotion application.
+# Model I/O aligned with data/nvidia_wbc_agile_velocity_unitree_g1/unitree_g1_velocity_e2e.yaml (Velocity-G1-History-v0).
+
+# --- Unitree G1 robot interface (real-robot DDS path) ---
+
+unitree_g1_robot:
+  network_interface: "enP2p1s0"
+  # 43 = G1 body (29 DOFs) + Dex 3-1 hands (14 DOFs).  The DDS publisher checks
+  # this against the postprocessor's output size, so it must match
+  # sdk_joint_order below.
+  g1_num_motors: 43
+
+# --- Device teleop (gamepad + keyboard, one operator) ---
+# TeleopTwistCommandOp reads a gamepad (primary) and a keyboard (fallback).
+# Composed only when the app is launched with --gamepad. Look at README for more detail
+gamepad:
+  lin_speed: 0.5 # m/s at full stick deflection / while a key is held
+  ang_speed: 0.5 # rad/s at full stick deflection / while a key is held
+  emit_period: 0.004 # s between device polls; well above the 50 Hz control rate so a
+  # command is at most one poll old when the policy reads it
+  gamepad_device: '' # evdev node or name substring, e.g. /dev/input/event12 or "Xbox" ('' = auto-detect)
+  gamepad_deadzone: 0.1 # fraction of full stick deflection ignored around centre
+  keyboard_device: '' # evdev node or name substring ('' = auto-detect)
+
+# --- Holoviz display ---
+holoviz:
+  width: 640
+  height: 480
+  tensors:
+    - name: ""
+      type: color
+      opacity: 1.0
+      priority: 0
+
+# --- Joint-order anchors ---
+
+_anchors:
+  initial_joint_positions: &g1_initial_joint_positions
+    left_hip_pitch_joint: -0.459701
+    right_hip_pitch_joint: -0.4437555
+    left_hip_roll_joint: 0.1529165
+    right_hip_roll_joint: -0.164957
+    left_hip_yaw_joint: -0.0315375
+    right_hip_yaw_joint: 0.0249875
+    left_knee_joint: 0.8852595
+    right_knee_joint: 0.882874
+    left_ankle_pitch_joint: -0.4589425
+    right_ankle_pitch_joint: -0.471091
+    left_ankle_roll_joint: -0.121295
+    right_ankle_roll_joint: 0.1095825
+  sdk_joint_order: &g1_sdk_joint_order
+    # Limb-grouped Unitree SDK / DDS convention.  Sim feeds this order via the
+    # physx_to_sdk / sdk_to_physx reorder scripts in g1_ucx.usda; the real
+    # robot publishes natively in this order.
+    - left_hip_pitch_joint
+    - left_hip_roll_joint
+    - left_hip_yaw_joint
+    - left_knee_joint
+    - left_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_hip_pitch_joint
+    - right_hip_roll_joint
+    - right_hip_yaw_joint
+    - right_knee_joint
+    - right_ankle_pitch_joint
+    - right_ankle_roll_joint
+    - waist_yaw_joint
+    - waist_roll_joint
+    - waist_pitch_joint
+    - left_shoulder_pitch_joint
+    - left_shoulder_roll_joint
+    - left_shoulder_yaw_joint
+    - left_elbow_joint
+    - left_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_shoulder_pitch_joint
+    - right_shoulder_roll_joint
+    - right_shoulder_yaw_joint
+    - right_elbow_joint
+    - right_wrist_roll_joint
+    - right_wrist_pitch_joint
+    - right_wrist_yaw_joint
+    # Dex 3-1 hand DOFs (14).  Ordering matches the USD asset / DDS hand
+    # message stride; the policy does not observe or actuate these.
+    - left_hand_index_0_joint
+    - left_hand_middle_0_joint
+    - left_hand_thumb_0_joint
+    - right_hand_index_0_joint
+    - right_hand_middle_0_joint
+    - right_hand_thumb_0_joint
+    - left_hand_index_1_joint
+    - left_hand_middle_1_joint
+    - left_hand_thumb_1_joint
+    - right_hand_index_1_joint
+    - right_hand_middle_1_joint
+    - right_hand_thumb_1_joint
+    - left_hand_thumb_2_joint
+    - right_hand_thumb_2_joint
+
+# --- Mock benchmark source (mock/mock_wbc_g1) ---
+
+mock_joint_source:
+  joint_names: *g1_sdk_joint_order
+
+gr00t_wbc:
+  onnx_path: data/nvidia_wbc_agile_velocity_unitree_g1/unitree_g1_velocity_e2e.onnx
+  sdk_joint_order: *g1_sdk_joint_order
+  policy_joint_order:
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - waist_yaw_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - waist_roll_joint
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - waist_pitch_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_shoulder_pitch_joint
+    - right_shoulder_pitch_joint
+    - left_ankle_pitch_joint
+    - right_ankle_pitch_joint
+    - left_shoulder_roll_joint
+    - right_shoulder_roll_joint
+    - left_ankle_roll_joint
+    - right_ankle_roll_joint
+    - left_shoulder_yaw_joint
+    - right_shoulder_yaw_joint
+    - left_elbow_joint
+    - right_elbow_joint
+    - left_wrist_roll_joint
+    - right_wrist_roll_joint
+    - left_wrist_pitch_joint
+    - right_wrist_pitch_joint
+    - left_wrist_yaw_joint
+    - right_wrist_yaw_joint
+  action_joint_order:
+    - left_hip_pitch_joint
+    - right_hip_pitch_joint
+    - left_hip_roll_joint
+    - right_hip_roll_joint
+    - waist_roll_joint
+    - left_hip_yaw_joint
+    - right_hip_yaw_joint
+    - waist_pitch_joint
+    - left_knee_joint
+    - right_knee_joint
+    - left_ankle_pitch_joint
+    - right_ankle_pitch_joint
+    - left_ankle_roll_joint
+    - right_ankle_roll_joint
+  default_joint_positions: *g1_initial_joint_positions
+  # Canonical per-radian PD gains. The real app emits these through DDS for joints without
+  # model-supplied gains; the base g1_ucx.usda mirrors them, while task layers may override them.
+  default_kp:
+    left_hip_pitch_joint: 100.0
+    left_hip_roll_joint: 100.0
+    left_hip_yaw_joint: 100.0
+    left_knee_joint: 200.0
+    left_ankle_pitch_joint: 20.0
+    left_ankle_roll_joint: 20.0
+    right_hip_pitch_joint: 100.0
+    right_hip_roll_joint: 100.0
+    right_hip_yaw_joint: 100.0
+    right_knee_joint: 200.0
+    right_ankle_pitch_joint: 20.0
+    right_ankle_roll_joint: 20.0
+    waist_yaw_joint: 300.0
+    waist_roll_joint: 300.0
+    waist_pitch_joint: 300.0
+    left_shoulder_pitch_joint: 90.0
+    left_shoulder_roll_joint: 60.0
+    left_shoulder_yaw_joint: 20.0
+    left_elbow_joint: 60.0
+    left_wrist_roll_joint: 4.0
+    left_wrist_pitch_joint: 4.0
+    left_wrist_yaw_joint: 4.0
+    right_shoulder_pitch_joint: 90.0
+    right_shoulder_roll_joint: 60.0
+    right_shoulder_yaw_joint: 20.0
+    right_elbow_joint: 60.0
+    right_wrist_roll_joint: 4.0
+    right_wrist_pitch_joint: 4.0
+    right_wrist_yaw_joint: 4.0
+  default_kd:
+    left_hip_pitch_joint: 2.5
+    left_hip_roll_joint: 2.5
+    left_hip_yaw_joint: 2.5
+    left_knee_joint: 5.0
+    left_ankle_pitch_joint: 0.2
+    left_ankle_roll_joint: 0.1
+    right_hip_pitch_joint: 2.5
+    right_hip_roll_joint: 2.5
+    right_hip_yaw_joint: 2.5
+    right_knee_joint: 5.0
+    right_ankle_pitch_joint: 0.2
+    right_ankle_roll_joint: 0.1
+    waist_yaw_joint: 5.0
+    waist_roll_joint: 5.0
+    waist_pitch_joint: 5.0
+    left_shoulder_pitch_joint: 2.0
+    left_shoulder_roll_joint: 1.0
+    left_shoulder_yaw_joint: 0.4
+    left_elbow_joint: 1.0
+    left_wrist_roll_joint: 0.2
+    left_wrist_pitch_joint: 0.2
+    left_wrist_yaw_joint: 0.2
+    right_shoulder_pitch_joint: 2.0
+    right_shoulder_roll_joint: 1.0
+    right_shoulder_yaw_joint: 0.4
+    right_elbow_joint: 1.0
+    right_wrist_roll_joint: 0.2
+    right_wrist_pitch_joint: 0.2
+    right_wrist_yaw_joint: 0.2
+  ang_vel_scale: 1.0
+  velocity_scale: 1.0
+  action_clamp: 10.0
+  last_actions_input_name: "last_actions"
+  velocity_command_lin_x: 0.0
+  velocity_command_lin_y: 0.0
+  velocity_command_ang_z: 0.0
+  history_terms:
+    - input_name: base_ang_vel_history
+      output_name: base_ang_vel_history_out
+      dim: 3
+      length: 5
+    - input_name: projected_gravity_history
+      output_name: projected_gravity_history_out
+      dim: 3
+      length: 5
+    - input_name: velocity_commands_history
+      output_name: velocity_commands_history_out
+      dim: 3
+      length: 5
+    - input_name: controlled_joint_pos_history
+      output_name: controlled_joint_pos_history_out
+      dim: 14
+      length: 5
+    - input_name: controlled_joint_vel_history
+      output_name: controlled_joint_vel_history_out
+      dim: 14
+      length: 5
+    - input_name: actions_history
+      output_name: actions_history_out
+      dim: 14
+      length: 5
+    - input_name: last_actions
+      output_name: last_actions_out
+      dim: 14
+
+# --- Stable start-up controller ---
+# Moves the G1 into a kinematically stable standing pose on startup, through a series of waypoints
+# then releases control to the WBC policy. The setup routine lives in the linked config_file.
+start_up:
+  sdk_joint_order: *g1_sdk_joint_order # 43-joint publisher command order
+  config_file: operators/start_up/config/g1_start_up.yaml
+  auto_enable_delay: 60.0 # s holding the final pose before automatic enable (0 = immediate)

@@ -1,0 +1,34 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "description": "Minimal application used to verify Isaac OS builds against Holoscan SDK 5.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0"
+      ]
+    },
+    "language": "C++",
+    "name": "mock_build",
+    "platforms": [
+      "x86_64",
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "run": {
+      "command": "<isaac_app_bin>/mock_build",
+      "workdir": "isaac_root"
+    },
+    "tags": [
+      "testing"
+    ],
+    "version": "0.1.0"
+  }
+}

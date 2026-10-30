@@ -1,0 +1,66 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Components
+
+<Note>
+
+Catalog of reusable operators, libraries and message schemas from the Holoscan
+platform and the Isaac OS reference repository.
+
+</Note>
+
+## Holoscan platform
+
+Browse the <Button href="https://www.holoscan.org/modules/" small outlined>Holoscan Modules</Button> for reusable components in the Holoscan platform.
+
+## Isaac OS reference components
+
+<Info>
+
+See [Integrate in your project](/isaac-os/how-to/integrate-in-your-project) to pull these components in your own project.
+
+</Info>
+
+
+### Operators and subgraphs
+
+
+| Use                          | Components                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cameras and image processing | [V4L2 capture](../../operators/v4l2_camera), [camera information](../../operators/camera_info), [image conversion](../../operators/image_conversion)                                                   |
+| Visual localization          | [cuVSLAM](../../operators/cuvslam)                                                                                                                                                                                                                                                             |
+| Policy inference             | [GR00T N1.7](../../operators/gr00t_n1_7), [SO-101 reach](../../operators/so101_reach)                                                                                                                                                              |
+| Motion control               | [Agile WBC](../../operators/agile_wbc), [sinus motion](../../operators/sinus_motion), [motion planner](../../operators/simple_motion_planner)                                                          |
+| Action processing            | [GR00T action handler](../../operators/gr00t_action_handler), [sequential action handler](../../operators/sequential_action_handler), [joint command combiner](../../operators/joint_command_combiner) |
+| Robot I/O                    | [SO-101](../../operators/so101), [G1 low-level I/O](../../operators/g1_low_level)                                                                                                                                                                  |
+| Simulation transport         | [UCX operators](../../operators/ucxx_ops), [Unitree simulator subgraph](../../operators/unitree_sim_ucx)                                                                                                                                           |
+| Startup and input            | [Startup motion](../../operators/start_up), [teleoperation](../../operators/teleop)                                                                                                                                                                |
+| Testing                      | [Mock operators](../../operators/mock), [message drop sink](../../operators/message_drop_sink)                                                                                                                                                     |
+
+
+### Libraries and utilities
+
+
+| Use                   | Components                                                                                                                                                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ROS 2 transport       | [ROS 2 bridge](../../common/ros2_bridge)                                                                                                                             |
+| Recording and replay  | [MCAP logger](../../common/mcap_logger), [MCAP replayer](../../common/mcap_replayer)                                     |
+| Coordinate transforms | [Pose tree](../../common/pose_tree)                                                                                                                                  |
+| Inference             | [TensorRT engine](../../common/tensorrt_engine)                                                                                                                      |
+| Video                 | [Encoder](../../common/nv_video_encoder), [decoder](../../common/nv_video_decoder); requires `ISAAC_ENABLE_NV_VIDEO_SDK` |
+| Robot driver          | [SO-101 serial driver](../../common/so101_driver)                                                                                                                    |
+| Benchmark workloads   | [Robot control benchmark](../../common/robot_control_benchmark); source compiled by each runtime, not a library target                                               |
+
+
+### Messages
+
+
+| Data                                    | Source                                                                                                                                                                                                                                                                                         |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Math, geometry and camera calibration   | [Math](../../common/math_cpu_messages), [geometry](../../common/geometry_cpu_messages), [camera information](../../common/camera_info_cpu_messages)        |
+| Joint state, commands and action chunks | [Joint messages](../../common/joint_cpu_messages), [command chunks](../../common/joint_command_chunk_cpu), [SO-101 state](../../common/so101_cpu_messages) |
+| Images                                  | [Image schema](../../common/image_schema)                                                                                                                                                                                                          |
+| UCX wire format                         | [FlatBuffers schemas](../../messages)                                                                                                                                                                                                              |

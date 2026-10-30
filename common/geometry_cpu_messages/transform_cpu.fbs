@@ -1,0 +1,24 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+include "geometry.fbs";
+include "header.fbs";
+
+namespace isaac;
+
+// A rigid transform (translation + rotation) built from CPU-resident holoscan.schema geometry
+// primitives. header and child_frame_id are optional: geometry_msgs/Transform carries neither,
+// geometry_msgs/TransformStamped supplies both -- both ROS2 types convert to/from this one
+// table.
+table TransformCpu {
+  translation: holoscan.schema.Vector3d (id: 0, required, native_inline);
+  rotation: holoscan.schema.Quaterniond (id: 1, required, native_inline);
+  header: holoscan.schema.Header (id: 2);
+
+  // Name of the child coordinate frame this transform maps into, mirroring
+  // geometry_msgs/TransformStamped.child_frame_id.
+  child_frame_id: string (id: 3);
+}
+
+root_type TransformCpu;
+file_identifier "ISTR";

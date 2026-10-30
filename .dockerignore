@@ -1,0 +1,6 @@
+# Ignore everything by default, then allowlist what the build needs.
+*
+
+!/Dockerfile
+!/pyproject.toml
+!/uv.lock

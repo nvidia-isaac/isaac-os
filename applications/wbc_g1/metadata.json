@@ -1,0 +1,63 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "mock",
+    "description": "Unitree G1 whole-body control: real robot over DDS, plus a mock reference graph.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "mock": {
+        "description": "Run the deterministic WBC graph without robot or simulator I/O.",
+        "run": {
+          "command": "<isaac_app_bin>/mock/mock_wbc_g1 --config-path=applications/wbc_g1/config/wbc_g1_config.yaml",
+          "workdir": "isaac_root"
+        }
+      },
+      "real": {
+        "description": "Run the Agile WBC policy on a real Unitree G1 over the low-level DDS channels.",
+        "run": {
+          "command": "<isaac_app_bin>/real/unitree_g1_wbc --config-path=applications/wbc_g1/config/wbc_g1_config.yaml",
+          "workdir": "isaac_root"
+        }
+      },
+      "sim": {
+        "description": "Run the WBC policy against Isaac Sim using the shared UCX endpoint.",
+        "run": {
+          "command": "<isaac_app_bin>/sim/sim_ucx_wbc_g1 --config-path=applications/wbc_g1/config/wbc_g1_sim_ucx_config.yaml",
+          "workdir": "isaac_root"
+        }
+      },
+      "unitree_sim": {
+        "description": "Run against Unitree MuJoCo on DDS domain 1 using the 29-joint simulator configuration.",
+        "run": {
+          "command": "<isaac_app_bin>/real/unitree_g1_wbc --domain-id=1 --config-path=applications/wbc_g1/config/wbc_g1_sim_config.yaml",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "wbc_g1",
+    "platforms": [
+      "x86_64",
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "tags": [
+      "robotics",
+      "locomotion",
+      "testing"
+    ],
+    "version": "0.1.0"
+  }
+}

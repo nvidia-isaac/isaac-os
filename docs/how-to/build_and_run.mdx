@@ -1,0 +1,224 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Build and run
+
+<Note>
+This guide provides instructions for running reference applications from the Isaac OS
+source repository. The steps below help you set up your environment and use the
+`./isaac_os` convenience utility to manage container builds, application builds and
+tests. See the
+[CLI reference](/isaac-os/reference/cli) for options and alternatives to the container workflow.
+For source locations, see the [repository map](../../README.md#repository).
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Build and run an application" hidePrompt actions={["cursor"]}>
+Find the application and run mode in our conversation and project. Ask me for
+missing details. If the application does not exist yet, stop and tell me that
+this guide covers only existing applications.
+Follow the [build and run guide](/isaac-os/how-to/build-and-run). Check the
+prerequisites, then build and run the application and verify the result.
+</Prompt>
+</llms-ignore>
+
+## Prerequisites
+
+For the container workflow, install:
+
+- Git and curl using your host's package manager.
+- Docker and [NVIDIA Container Toolkit][nv-container-toolkit] for GPU access.
+- [uv][uv-install] to launch the pinned CLI.
+
+Check [platform support](/isaac-os/reference/platforms). On x86_64, use an
+NVIDIA GPU with compute capability >= 7.5 for [Video Codec SDK 13.0][codec-sdk]
+and driver 595 or newer for the default CUDA 13.2 container.
+Jetson drivers come with JetPack; follow the [AGX Thor Docker setup][thor-docker]
+if your Jetson installation does not include the container toolkit.
+
+First, verify that your login user can access Docker without `sudo`:
+
+```bash
+docker info
+```
+
+<Accordion title="⚠️ Docker socket permission denied">
+
+If `docker info` reports permission denied for `/var/run/docker.sock`, your user
+probably isn't in the `docker` group. Add it with:
+
+```bash
+sudo usermod -aG docker "$USER"
+```
+
+Log out and back in (or reconnect over SSH), then retry `docker info`.
+See [Docker's post-installation guidance](https://docs.docker.com/engine/install/linux-postinstall/)
+for details.
+
+</Accordion>
+
+Once `docker info` succeeds, check the registered runtimes:
+
+```bash
+docker info --format '{{json .Runtimes}}'
+```
+
+Only if this command succeeds and its output does not include `nvidia`, register
+the NVIDIA runtime and check again:
+
+```bash
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+docker info --format '{{json .Runtimes}}'
+```
+
+Install uv:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Reopen your terminal and ensure `uv` is in your PATH:
+
+```bash
+uv --version
+```
+
+<Accordion title="⚠️ The CLI reports that uv is required">
+
+Check the uv installer's reported location and add it to your PATH. Alternatively,
+use a pre-installed CLI matching the repository's pin; see
+[CLI requirements](/isaac-os/reference/cli#requirements).
+
+</Accordion>
+
+Network access is needed for the first CLI, image and dependency downloads.
+Inference applications also download models. For a guided checkout and first run,
+follow [Getting started](/isaac-os/tutorials/getting-started).
+
+
+
+## Build and run an application
+
+Run these commands from the repository root. `run` builds the development container
+and application, fetches dependencies and starts the selected mode:
+
+```bash
+./isaac_os run <app_name> <mode>
+```
+
+<Accordion title="⚠️ TCP port unavailable after restarting a simulation app">
+
+If restarting a simulation app reports that its TCP port is already in use, check whether another
+process is still listening on that port. If no listener remains, recently closed connections may
+still be in TCP TIME_WAIT, typically lasting about 60 seconds on Linux. Wait until the port becomes
+available, then retry. If the issue persists, inspect the remaining processes and TCP socket states.
+
+</Accordion>
+
+<Accordion title="❓ Why does the first run take longer?">
+
+The first run downloads images and dependencies, then compiles the application.
+Inference applications may also build TensorRT engines. Later runs reuse these
+caches. Isaac Sim has a separate shader cache; see [simulator setup](/isaac-os/how-to/set-up-isaac-sim).
+
+</Accordion>
+
+To build and run separately:
+
+```bash
+./isaac_os build-container
+./isaac_os build <app_name> --no-docker-build
+./isaac_os run <app_name> <mode> --no-docker-build --no-local-build
+```
+
+Omit the skip flags when the image or application inputs have changed.
+
+<Tip>
+
+Use `run-container` for custom checks in an application's development environment. For
+example, check GPU access with:
+
+```bash
+./isaac_os run-container <app_name> <mode> -- nvidia-smi
+```
+
+For individual CMake targets, follow the
+[component build instructions](/isaac-os/reference/cli#applications-and-mode-names).
+
+</Tip>
+
+
+<Accordion title="Buildx resource-limit warning">
+
+If the build prints `Docker Buildx does not support build resource limits; the job CPU
+limit will not be forwarded to build steps`, the CLI could not confirm support for
+Docker's `--resource` build option. It continues without forwarding the launching
+process's allowed CPU set to the image-build steps. Those steps may use CPUs outside
+that set, subject to the builder's own configuration.
+
+This warning alone does not mean the build failed, and it does not report the
+application container's runtime CPU affinity. You can continue the build if you do
+not require that build CPU restriction. Complete builds before collecting latency
+measurements.
+
+If build CPU restrictions are required, check the Docker installation used by the CLI:
+
+```bash
+docker buildx version
+docker build --help
+```
+
+Look for `--resource` in the help output. The warning can also occur if the CLI's
+help query fails or times out. If the option is listed but the warning persists,
+retain the build log and these command outputs for diagnosis; do not assume the
+requested CPU restriction was applied.
+
+</Accordion>
+
+To reduce latency and jitter in the applications that you run, see
+[Optimize your host](/isaac-os/how-to/optimize-your-host).
+
+## Test
+
+`test` configures and builds the repository test graph, then runs CTest:
+
+```bash
+./isaac_os test
+```
+
+Select one application's tests:
+
+```bash
+./isaac_os test <app_name>
+```
+
+To separate building from running tests, use the same application selection for
+both commands, or omit it from both as shown here:
+
+```bash
+./isaac_os test --ctest-options='-DBUILD_ONLY=ON'
+./isaac_os test --ctest-options='-DTEST_ONLY=ON'
+```
+
+Check CTest's summary for failures.
+
+<Accordion title="⚠️ TEST_ONLY needs an existing test build">
+
+`test` uses `cmake/isaac_os.container.ctest` and `build/all` by default. Without an
+application argument, it batches targets and shares dependency builds. Selecting
+an application reconfigures that directory for its tests. `TEST_ONLY` requires this
+test build; it does not reuse the individual application build made by `build` or `run`.
+
+</Accordion>
+
+For linting and code style, see
+[CONTRIBUTING.md](../../CONTRIBUTING.md#development-checks).
+
+[nv-container-toolkit]: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+[uv-install]: https://docs.astral.sh/uv/getting-started/installation/
+[codec-sdk]: https://docs.nvidia.com/video-technologies/video-codec-sdk/13.0/read-me/index.html
+
+[thor-docker]: https://docs.nvidia.com/jetson/agx-thor-devkit/user-guide/latest/setup_docker.html

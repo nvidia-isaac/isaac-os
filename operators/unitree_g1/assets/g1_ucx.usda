@@ -1,0 +1,1070 @@
+#usda 1.0
+
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+(
+    defaultPrim = "g1"
+    metersPerUnit = 1
+    upAxis = "Z"
+    # A nonzero timeline range lets simulation time advance during playback.
+    startTimeCode = 0
+    endTimeCode = 1000000
+)
+
+def Xform "g1" (
+    references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Robots/Unitree/G1/g1.usd@
+)
+{
+    string isaac:namespace (
+        displayName = "Namespace"
+        doc = "Namespace of the prim in Isaac Sim"
+    )
+    quatf xformOp:orient = (0.999832471, -0.00045, 0.01763, 0.0049)
+    float3 xformOp:scale = (1, 1, 1)
+    # Stable standing pose.
+    double3 xformOp:translate = (0, 0, 0.72724)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+    def OmniGraph "ActionGraph"
+    {
+        token evaluationMode = "Automatic"
+        token evaluator:type = "execution"
+        token fabricCacheBacking = "StageWithoutHistory"
+        int2 fileFormatVersion = (1, 9)
+        token pipelineStage = "pipelineStageOnDemand"
+
+        def OmniGraphNode "on_playback_tick" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            token node:type = "omni.graph.action.OnPlaybackTick"
+            int node:typeVersion = 2
+            custom double outputs:deltaSeconds
+            custom double outputs:frame
+            custom uint outputs:tick (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom double outputs:time
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-3286.8606, 63.82496)
+        }
+
+        # Run control from decimated physics steps.
+        def OmniGraphNode "on_physics_step" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            token node:type = "isaacsim.core.nodes.OnPhysicsStep"
+            int node:typeVersion = 1
+            custom double outputs:deltaSimulationTime
+            custom double outputs:deltaSystemTime
+            custom uint outputs:step (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-3287, -120)
+        }
+
+        def OmniGraphNode "physics_control_gate" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/on_physics_step.outputs:step>
+            custom uint inputs:step = 1
+            token node:type = "isaacsim.core.nodes.IsaacSimulationGate"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-3100, -120)
+        }
+
+        # Render the camera on playback ticks.
+        def OmniGraphNode "isaac_create_render_product" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/on_playback_tick.outputs:tick>
+            custom rel inputs:cameraPrim = </g1/torso_link/head_link/RobotHeadCam> (
+                customData = {
+                    dictionary omni = {
+                        dictionary graph = {
+                            string relType = "target"
+                        }
+                    }
+                }
+            )
+            custom uint inputs:width = 640
+            custom uint inputs:height = 480
+            custom bool inputs:enabled = 1
+            token node:type = "isaacsim.core.nodes.IsaacCreateRenderProduct"
+            int node:typeVersion = 3
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom token outputs:renderProductPath
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2959, 500)
+        }
+
+        def OmniGraphNode "ucx_camera_helper" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom bool inputs:sendCudaBuffer = 1
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/isaac_create_render_product.outputs:execOut>
+            # inputs:port is overridden by isaac_sim_ucx.py at stage-load
+            # time (see _set_ucx_port) so every UCX node matches the launcher's
+            # --port.  Leave it unset here so the USDA is port-agnostic.
+            custom uint64 inputs:port
+            custom token inputs:renderProductPath
+            prepend token inputs:renderProductPath.connect = </g1/ActionGraph/isaac_create_render_product.outputs:renderProductPath>
+            custom bool inputs:resetSimulationTimeOnStop = 1
+            # UCXCameraHelper's OGN default tag is the literal value 10.  Override it with
+            # FNV-1a("isaac.Image") so the camera tag follows the same hash convention as the
+            # joint state / joint command / clock tags (which use the OGN defaults).
+            custom uint64 inputs:tag = 270059627
+            custom bool inputs:useSystemTime = 0
+            token node:type = "isaacsim.ucx.nodes.UCXCameraHelper"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2959, 570)
+        }
+
+        def OmniGraphNode "isaac_read_simulation_time" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint64 inputs:referenceTimeDenominator
+            custom int64 inputs:referenceTimeNumerator
+            custom bool inputs:resetOnStop
+            token node:type = "isaacsim.core.nodes.IsaacReadSimulationTime"
+            int node:typeVersion = 1
+            custom double outputs:simulationTime
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-3264.7957, 593.5719)
+        }
+
+        def OmniGraphNode "isaac_read_joint_state_node" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/physics_control_gate.outputs:execOut>
+            custom rel inputs:prim = </g1/pelvis> (
+                customData = {
+                    dictionary omni = {
+                        dictionary graph = {
+                            string relType = "target"
+                        }
+                    }
+                }
+            )
+            token node:type = "isaacsim.sensors.physics.IsaacReadJointState"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom uchar[] outputs:jointDofTypes
+            custom double[] outputs:jointEfforts
+            custom token[] outputs:jointNames
+            custom double[] outputs:jointPositions
+            custom double[] outputs:jointVelocities
+            custom float outputs:sensorTime
+            custom float outputs:stageMetersPerUnit
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2966.0085, -22.35699)
+        }
+
+        # PhysX DOF order -> SDK joint order for all 43 joints.
+        def OmniGraphNode "physx_to_sdk" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/isaac_read_joint_state_node.outputs:execOut>
+            custom double[] inputs:jointPositions
+            prepend double[] inputs:jointPositions.connect = </g1/ActionGraph/isaac_read_joint_state_node.outputs:jointPositions>
+            custom double[] inputs:jointVelocities
+            prepend double[] inputs:jointVelocities.connect = </g1/ActionGraph/isaac_read_joint_state_node.outputs:jointVelocities>
+            custom double[] inputs:jointEfforts
+            prepend double[] inputs:jointEfforts.connect = </g1/ActionGraph/isaac_read_joint_state_node.outputs:jointEfforts>
+            custom double[] outputs:jointPositions
+            custom double[] outputs:jointVelocities
+            custom double[] outputs:jointEfforts
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom string inputs:script = """
+# omni.graph.scriptnode shares a single Python module namespace across ALL
+# ScriptNodes in the graph.  Helper functions and module-level globals defined
+# here would be silently overwritten by a same-named symbol in another
+# ScriptNode (see sdk_to_physx below for the inverse pair).  Keep EVERYTHING
+# inside compute(); the only module-level object is a uniquely-named state
+# dict (currently unused, present for symmetry with sdk_to_physx).
+import numpy as np
+import omni.graph.core as og
+
+_state_physx_to_sdk = {}
+
+def compute(db):
+    PHYSX_TO_SDK = np.array([
+         0,  6, 12,  1,  7, 13,  2,  8, 14,  3,
+         9, 15, 22,  4, 10, 16, 23,  5, 11, 17,
+        24, 18, 25, 19, 26, 20, 27, 21, 28,
+        34, 32, 29, 41, 39, 36, 35, 33, 30, 42,
+        40, 37, 31, 38,
+    ], dtype=np.int64)
+    NJOINTS = 43
+
+    def permute(src_in):
+        s = np.asarray(src_in, dtype=np.float64)
+        if s.size < NJOINTS:
+            return s
+        o = s.copy()
+        o[PHYSX_TO_SDK] = s[:NJOINTS]
+        return o
+
+    db.outputs.jointPositions = permute(np.asarray(db.inputs.jointPositions, dtype=np.float64))
+    db.outputs.jointVelocities = permute(np.asarray(db.inputs.jointVelocities, dtype=np.float64))
+    db.outputs.jointEfforts = permute(np.asarray(db.inputs.jointEfforts, dtype=np.float64))
+    db.outputs.execOut = og.ExecutionAttributeState.ENABLED
+    return True
+"""
+            token node:type = "omni.graph.scriptnode.ScriptNode"
+            int node:typeVersion = 1
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2700, -16.2889)
+        }
+
+        def OmniGraphNode "ucx_publish_joint_state" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/physx_to_sdk.outputs:execOut>
+            custom double[] inputs:jointEfforts
+            prepend double[] inputs:jointEfforts.connect = </g1/ActionGraph/physx_to_sdk.outputs:jointEfforts>
+            custom double[] inputs:jointPositions
+            prepend double[] inputs:jointPositions.connect = </g1/ActionGraph/physx_to_sdk.outputs:jointPositions>
+            custom double[] inputs:jointVelocities
+            prepend double[] inputs:jointVelocities.connect = </g1/ActionGraph/physx_to_sdk.outputs:jointVelocities>
+            custom uint inputs:port
+            custom uint64 inputs:tag
+            custom uint inputs:timeoutMs = 1000
+            custom double inputs:timeStamp
+            prepend double inputs:timeStamp.connect = </g1/ActionGraph/isaac_read_simulation_time.outputs:simulationTime>
+            token node:type = "isaacsim.ucx.nodes.UCXPublishJointState"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2432, -16.2889)
+        }
+
+        def OmniGraphNode "ucx_publish_clock" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            delete uint inputs:execIn.connect = </g1/ActionGraph/ucx_publish_imu.outputs:execOut>
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/ucx_publish_joint_state.outputs:execOut>
+            custom uint inputs:port
+            custom uint64 inputs:tag
+            custom uint inputs:timeoutMs = 1000
+            custom double inputs:timeStamp
+            prepend double inputs:timeStamp.connect = </g1/ActionGraph/isaac_read_simulation_time.outputs:simulationTime>
+            token node:type = "isaacsim.ucx.nodes.UCXPublishClock"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2132.5518, 195.302)
+        }
+
+        def OmniGraphNode "ucx_subscribe_joint_command" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/ucx_publish_clock.outputs:execOut>
+            custom uint inputs:port
+            custom uint64 inputs:tag
+            custom uint inputs:timeoutMs = 1000
+            token node:type = "isaacsim.ucx.nodes.UCXSubscribeJointCommand"
+            int node:typeVersion = 1
+            custom double[] outputs:effortCommand
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom double[] outputs:positionCommand
+            custom double outputs:timeStamp
+            custom double[] outputs:velocityCommand
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-1859.0011, 203.09709)
+        }
+
+        # sdk_joint_order -> PhysX DOF order.  Inverse of physx_to_sdk; permutes
+        # position/velocity/effort commands so the articulation controller
+        # drives the right physical joints when commands arrive in
+        # sdk_joint_order on the wire.
+        def OmniGraphNode "sdk_to_physx" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/ucx_subscribe_joint_command.outputs:execOut>
+            custom double[] inputs:positionCommand
+            prepend double[] inputs:positionCommand.connect = </g1/ActionGraph/ucx_subscribe_joint_command.outputs:positionCommand>
+            custom double[] inputs:velocityCommand
+            prepend double[] inputs:velocityCommand.connect = </g1/ActionGraph/ucx_subscribe_joint_command.outputs:velocityCommand>
+            custom double[] inputs:effortCommand
+            prepend double[] inputs:effortCommand.connect = </g1/ActionGraph/ucx_subscribe_joint_command.outputs:effortCommand>
+            custom double[] outputs:positionCommand
+            custom double[] outputs:velocityCommand
+            custom double[] outputs:effortCommand
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom string inputs:script = """
+# omni.graph.scriptnode shares a single Python module namespace across ALL
+# ScriptNodes in the graph.  See sibling note on physx_to_sdk above.  Keep
+# EVERYTHING inside compute(); the only module-level object is a uniquely-
+# named state dict (currently unused, present for symmetry with physx_to_sdk).
+import numpy as np
+import omni.graph.core as og
+
+_state_sdk_to_physx = {}
+
+def compute(db):
+    SDK_TO_PHYSX = np.array([
+         0,  3,  6,  9, 13, 17,  1,  4,  7, 10,
+        14, 18,  2,  5,  8, 11, 15, 19, 21, 23,
+        25, 27, 12, 16, 20, 22, 24, 26, 28,
+        31, 37, 41, 30, 36, 29, 35, 34, 40, 42,
+        33, 39, 32, 38,
+    ], dtype=np.int64)
+    NJOINTS = 43
+
+    def permute(src_in):
+        s = np.asarray(src_in, dtype=np.float64)
+        if s.size < NJOINTS:
+            return s
+        o = s.copy()
+        o[SDK_TO_PHYSX] = s[:NJOINTS]
+        return o
+
+    db.outputs.positionCommand = permute(np.asarray(db.inputs.positionCommand, dtype=np.float64))
+    db.outputs.velocityCommand = permute(np.asarray(db.inputs.velocityCommand, dtype=np.float64))
+    db.outputs.effortCommand = permute(np.asarray(db.inputs.effortCommand, dtype=np.float64))
+    db.outputs.execOut = og.ExecutionAttributeState.ENABLED
+    return True
+"""
+            token node:type = "omni.graph.scriptnode.ScriptNode"
+            int node:typeVersion = 1
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-1640, 31.192924)
+        }
+
+        def OmniGraphNode "articulation_controller" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom double[] inputs:effortCommand
+            prepend double[] inputs:effortCommand.connect = </g1/ActionGraph/sdk_to_physx.outputs:effortCommand>
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/sdk_to_physx.outputs:execOut>
+            custom int[] inputs:jointIndices
+            custom token[] inputs:jointNames
+            prepend token[] inputs:jointNames.connect = </g1/ActionGraph/isaac_read_joint_state_node.outputs:jointNames>
+            custom double[] inputs:positionCommand
+            prepend double[] inputs:positionCommand.connect = </g1/ActionGraph/sdk_to_physx.outputs:positionCommand>
+            custom string inputs:robotPath
+            custom rel inputs:targetPrim = </g1/pelvis> (
+                customData = {
+                    dictionary omni = {
+                        dictionary graph = {
+                            string relType = "target"
+                        }
+                    }
+                }
+            )
+            custom double[] inputs:velocityCommand
+            prepend double[] inputs:velocityCommand.connect = </g1/ActionGraph/sdk_to_physx.outputs:velocityCommand>
+            token node:type = "isaacsim.core.nodes.IsaacArticulationController"
+            int node:typeVersion = 1
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-1416.2997, 31.192924)
+        }
+
+        def OmniGraphNode "isaac_read_imu_node" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/physics_control_gate.outputs:execOut>
+            custom rel inputs:imuPrim = </g1/pelvis/imu_in_pelvis> (
+                customData = {
+                    dictionary omni = {
+                        dictionary graph = {
+                            string relType = "target"
+                        }
+                    }
+                }
+            )
+            custom bool inputs:readGravity
+            custom bool inputs:useLatestData
+            token node:type = "isaacsim.sensors.physics.IsaacReadIMU"
+            int node:typeVersion = 1
+            custom vector3d outputs:angVel
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            custom vector3d outputs:linAcc
+            custom quatd outputs:orientation
+            custom float outputs:sensorTime
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2928.007, 289.0119)
+        }
+
+        def OmniGraphNode "ucx_publish_imu" (
+            prepend apiSchemas = ["NodeGraphNodeAPI"]
+        )
+        {
+            custom vector3d inputs:angularVelocity
+            prepend vector3d inputs:angularVelocity.connect = </g1/ActionGraph/isaac_read_imu_node.outputs:angVel>
+            custom uint inputs:execIn (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            prepend uint inputs:execIn.connect = </g1/ActionGraph/isaac_read_imu_node.outputs:execOut>
+            custom string inputs:frameId
+            custom vector3d inputs:linearAcceleration
+            prepend vector3d inputs:linearAcceleration.connect = </g1/ActionGraph/isaac_read_imu_node.outputs:linAcc>
+            custom quatd inputs:orientation
+            prepend quatd inputs:orientation.connect = </g1/ActionGraph/isaac_read_imu_node.outputs:orientation>
+            # inputs:port is overridden by isaac_sim_ucx.py at stage-load
+            # time (see _set_ucx_port) so every UCX node matches the launcher's
+            # --port.  Leave it unset here so the USDA is port-agnostic.
+            custom uint inputs:port
+            bool inputs:publishAngularVelocity = 1
+            bool inputs:publishLinearAcceleration = 1
+            bool inputs:publishOrientation = 1
+            custom uint64 inputs:tag = 1508880735
+            custom uint inputs:timeoutMs = 1000
+            custom double inputs:timeStamp
+            prepend double inputs:timeStamp.connect = </g1/ActionGraph/isaac_read_simulation_time.outputs:simulationTime>
+            token node:type = "isaacsim.ucx.nodes.UCXPublishImu"
+            int node:typeVersion = 1
+            custom uint outputs:execOut (
+                customData = {
+                    bool isExecution = 1
+                }
+            )
+            uniform token ui:nodegraph:node:expansionState = "open"
+            uniform float2 ui:nodegraph:node:pos = (-2439.3113, 241.17316)
+        }
+    }
+
+    over "joints"
+    {
+        # Base angular drive stiffness/damping, authored per degree. These match the canonical
+        # per-radian gains in applications/wbc_g1/config/wbc_g1_config.yaml;
+        # task layers may override them.
+        # Initialize joint state and drive targets to the standing pose.
+        over "left_hip_pitch_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0436332
+            float drive:angular:physics:stiffness = 1.74533
+            float drive:angular:physics:targetPosition = -26.338927
+            float state:angular:physics:position = -26.338927
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_hip_roll_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0436332
+            float drive:angular:physics:stiffness = 1.74533
+            float drive:angular:physics:targetPosition = 8.761470
+            float state:angular:physics:position = 8.761470
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_hip_yaw_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0436332
+            float drive:angular:physics:stiffness = 1.74533
+            float drive:angular:physics:targetPosition = -1.806966
+            float state:angular:physics:position = -1.806966
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_knee_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0872665
+            float drive:angular:physics:stiffness = 3.49066
+            float drive:angular:physics:targetPosition = 50.721633
+            float state:angular:physics:position = 50.721633
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_ankle_pitch_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00349066
+            float drive:angular:physics:stiffness = 0.349066
+            float drive:angular:physics:targetPosition = -26.295468
+            float state:angular:physics:position = -26.295468
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_ankle_roll_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00174533
+            float drive:angular:physics:stiffness = 0.349066
+            float drive:angular:physics:targetPosition = -6.949692
+            float state:angular:physics:position = -6.949692
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_hip_pitch_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0436332
+            float drive:angular:physics:stiffness = 1.74533
+            float drive:angular:physics:targetPosition = -25.425317
+            float state:angular:physics:position = -25.425317
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_hip_roll_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0436332
+            float drive:angular:physics:stiffness = 1.74533
+            float drive:angular:physics:targetPosition = -9.451340
+            float state:angular:physics:position = -9.451340
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_hip_yaw_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0436332
+            float drive:angular:physics:stiffness = 1.74533
+            float drive:angular:physics:targetPosition = 1.431678
+            float state:angular:physics:position = 1.431678
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_knee_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0872665
+            float drive:angular:physics:stiffness = 3.49066
+            float drive:angular:physics:targetPosition = 50.584954
+            float state:angular:physics:position = 50.584954
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_ankle_pitch_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00349066
+            float drive:angular:physics:stiffness = 0.349066
+            float drive:angular:physics:targetPosition = -26.991526
+            float state:angular:physics:position = -26.991526
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_ankle_roll_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00174533
+            float drive:angular:physics:stiffness = 0.349066
+            float drive:angular:physics:targetPosition = 6.278615
+            float state:angular:physics:position = 6.278615
+            float state:angular:physics:velocity = 0
+        }
+
+        over "waist_yaw_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0872665
+            float drive:angular:physics:stiffness = 5.23599
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "waist_roll_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0872665
+            float drive:angular:physics:stiffness = 5.23599
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "waist_pitch_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0872665
+            float drive:angular:physics:stiffness = 5.23599
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_shoulder_pitch_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 1.5708
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_shoulder_roll_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0174533
+            float drive:angular:physics:stiffness = 1.0472
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_shoulder_yaw_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00698132
+            float drive:angular:physics:stiffness = 0.349066
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_elbow_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0174533
+            float drive:angular:physics:stiffness = 1.0472
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_wrist_roll_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00349066
+            float drive:angular:physics:stiffness = 0.0698132
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_wrist_pitch_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00349066
+            float drive:angular:physics:stiffness = 0.0698132
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "left_wrist_yaw_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00349066
+            float drive:angular:physics:stiffness = 0.0698132
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_shoulder_pitch_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0349066
+            float drive:angular:physics:stiffness = 1.5708
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_shoulder_roll_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0174533
+            float drive:angular:physics:stiffness = 1.0472
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_shoulder_yaw_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00698132
+            float drive:angular:physics:stiffness = 0.349066
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_elbow_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.0174533
+            float drive:angular:physics:stiffness = 1.0472
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_wrist_roll_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00349066
+            float drive:angular:physics:stiffness = 0.0698132
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_wrist_pitch_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00349066
+            float drive:angular:physics:stiffness = 0.0698132
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+
+        over "right_wrist_yaw_joint" (
+            prepend apiSchemas = ["PhysicsJointStateAPI:angular"]
+        )
+        {
+            float drive:angular:physics:damping = 0.00349066
+            float drive:angular:physics:stiffness = 0.0698132
+            float drive:angular:physics:targetPosition = 0
+            float state:angular:physics:position = 0
+            float state:angular:physics:velocity = 0
+        }
+    }
+
+    over "pelvis" (
+        prepend apiSchemas = ["PhysxArticulationAPI"]
+    )
+    {
+        # Raise position-solver iterations (PhysX default 4) to firm up foot/ground
+        # contact and reduce interpenetration.
+        uint physxArticulation:solverPositionIterationCount = 32
+        uint physxArticulation:solverVelocityIterationCount = 4
+        quatd xformOp:orient = (1, 0, 0, 0)
+        double3 xformOp:scale = (1, 1, 1)
+        double3 xformOp:translate = (0, 0, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+        over "imu_in_pelvis" (
+            prepend apiSchemas = ["IsaacSensorSchemaIsaacImuSensor"]
+        )
+        {
+            bool isaacsensor:imu:enabled = 1
+            float isaacsensor:imu:sensorPeriod = 0
+        }
+    }
+
+    over "left_hip_pitch_link"
+    {
+    }
+
+    over "left_hip_roll_link"
+    {
+    }
+
+    over "left_hip_yaw_link"
+    {
+    }
+
+    over "left_knee_link"
+    {
+    }
+
+    over "left_ankle_pitch_link"
+    {
+    }
+
+    over "left_ankle_roll_link"
+    {
+    }
+
+    over "right_hip_pitch_link"
+    {
+    }
+
+    over "right_hip_roll_link"
+    {
+    }
+
+    over "right_hip_yaw_link"
+    {
+    }
+
+    over "right_knee_link"
+    {
+    }
+
+    over "right_ankle_pitch_link"
+    {
+    }
+
+    over "right_ankle_roll_link"
+    {
+    }
+
+    over "waist_yaw_link"
+    {
+    }
+
+    over "waist_roll_link"
+    {
+    }
+
+    over "torso_link"
+    {
+        # Head-mounted RGB camera.
+        def Xform "head_link"
+        {
+            quatd xformOp:orient = (1, 0, 0, 0)
+            double3 xformOp:translate = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+
+            def Camera "RobotHeadCam"
+            {
+                float2 clippingRange = (0.1, 5)
+                float focalLength = 15
+                float focusDistance = 400
+                float horizontalAperture = 20.955
+                float verticalAperture = 15.71625
+                quatd xformOp:orient = (0.62721, 0.32651, -0.32651, -0.62721)
+                double3 xformOp:translate = (0.04485, 0, 0.35325)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+            }
+        }
+
+        # D435i depth camera.  Transform from URDF d435_joint:
+        #   xyz="0.0576235 0.01753 0.41987"
+        #   rpy="0 0.8307767239493009 0"  (≈ 47.6° forward pitch about Y)
+        # Quaternion (w x y z): (0.9149596678, 0, 0.4035452964, 0)
+        def Xform "d435_mount"
+        {
+            quatd xformOp:orient = (0.9149596678, 0, 0.4035452964, 0)
+            double3 xformOp:translate = (0.0576235, 0.01753, 0.41987)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+
+            def Camera "ucx_camera"
+            {
+                float2 clippingRange = (0.01, 1000)
+                float focalLength = 24
+                float focusDistance = 0.1
+                float horizontalAperture = 36
+                float verticalAperture = 27
+                # Rotate from USD camera convention (-Z forward) to +X forward in
+                # the d435_mount frame, with +Z world-up preserved.
+                float3 xformOp:rotateXYZ = (90, 0, -90)
+                uniform token[] xformOpOrder = ["xformOp:rotateXYZ"]
+            }
+        }
+    }
+
+    over "left_shoulder_pitch_link"
+    {
+    }
+
+    over "left_shoulder_roll_link"
+    {
+    }
+
+    over "left_shoulder_yaw_link"
+    {
+    }
+
+    over "left_elbow_link"
+    {
+    }
+
+    over "left_wrist_roll_link"
+    {
+    }
+
+    over "left_wrist_pitch_link"
+    {
+    }
+
+    over "left_wrist_yaw_link"
+    {
+    }
+
+    over "right_shoulder_pitch_link"
+    {
+    }
+
+    over "right_shoulder_roll_link"
+    {
+    }
+
+    over "right_shoulder_yaw_link"
+    {
+    }
+
+    over "right_elbow_link"
+    {
+    }
+
+    over "right_wrist_roll_link"
+    {
+    }
+
+    over "right_wrist_pitch_link"
+    {
+    }
+
+    over "right_wrist_yaw_link"
+    {
+    }
+}
+
+# Isaac Sim's built-in Simple Warehouse environment (ships its own floor, walls,
+# and lighting). Resolved from the same Isaac 6.0 asset bundle as the robot.
+def Xform "Environment" (
+    prepend references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.0/Isaac/Environments/Simple_Warehouse/warehouse.usd@
+)
+{
+}
+
+def PhysicsScene "PhysicsScene" (
+    prepend apiSchemas = ["PhysxSceneAPI", "NewtonSceneAPI"]
+)
+{
+    # 200 Hz physics; --substeps 4 sets 50 Hz control.
+    uint physxScene:timeStepsPerSecond = 200
+}

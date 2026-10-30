@@ -1,0 +1,250 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+cmake_minimum_required(VERSION 3.20)
+project(resource_fixture NONE)
+
+if(NOT DEFINED ISAAC_RESOURCE_CACHE AND NOT DEFINED ENV{ISAAC_RESOURCE_CACHE})
+  set(ISAAC_RESOURCE_CACHE "${CMAKE_SOURCE_DIR}/.cache/resources" CACHE PATH "Isaac resource cache dir")
+endif()
+
+include(isaac_add_resource)
+
+set(TEST_FILE_URL "" CACHE STRING "File URL")
+set(TEST_FILE_HASH "" CACHE STRING "File hash")
+set(TEST_ARCHIVE_URL "" CACHE STRING "Archive URL")
+set(TEST_ARCHIVE_HASH "" CACHE STRING "Archive hash")
+set(TEST_ARCHIVE_STRIP_PREFIX "payload-root" CACHE STRING "Strip prefix")
+set(TEST_ARCHIVE_KEEP_ARCHIVE FALSE CACHE BOOL "Keep archive after extraction")
+set(TEST_ARCHIVE_AS_FILE_URL "" CACHE STRING "Archive bytes exposed with a file extension")
+set(TEST_FILTERED_ARCHIVE_URL "" CACHE STRING "Filtered archive URL")
+set(TEST_FILTERED_ARCHIVE_HASH "" CACHE STRING "Filtered archive hash")
+set(TEST_FILTERED_ARCHIVE_STRIP_PREFIX "" CACHE STRING "Filtered archive strip prefix")
+set(TEST_FILTERED_ARCHIVE_PATTERNS "" CACHE STRING "Semicolon-separated archive patterns")
+set(TEST_EXPLICIT_LINK_MODE "LINK_DIR" CACHE STRING "Explicit resource link argument mode")
+set(TEST_IDENTITY_PATCH "" CACHE FILEPATH "Patch used for content identity tests")
+set(TEST_RENAMED_FILE_URL "" CACHE STRING "Renamed file URL used for content identity tests")
+set(TEST_VARIANT_URL "" CACHE STRING "Variant archive URL")
+set(TEST_VARIANT_HASH "" CACHE STRING "Variant archive hash")
+set(TEST_VARIANT_STRIP_PREFIX "" CACHE STRING "Variant strip prefix")
+set(TEST_VARIANT_PATTERNS "" CACHE STRING "Variant archive patterns (semicolon-separated)")
+
+if(NOT TEST_FILE_URL OR NOT TEST_FILE_HASH OR NOT TEST_ARCHIVE_URL OR NOT TEST_ARCHIVE_HASH)
+  message(FATAL_ERROR "Fixture inputs are missing.")
+endif()
+
+isaac_add_resource(res_file
+  URL "${TEST_FILE_URL}"
+  EXPECTED_HASH "${TEST_FILE_HASH}"
+)
+
+if(TEST_EXPLICIT_LINK_MODE STREQUAL "LINK_DIR")
+  isaac_add_resource(res_file_explicit
+    URL "${TEST_FILE_URL}"
+    EXPECTED_HASH "${TEST_FILE_HASH}"
+    LINK_DIR "${CMAKE_SOURCE_DIR}/data/explicit"
+  )
+elseif(TEST_EXPLICIT_LINK_MODE STREQUAL "FALSE_VALUE")
+  isaac_add_resource(res_file_explicit
+    URL "${TEST_FILE_URL}"
+    EXPECTED_HASH "${TEST_FILE_HASH}"
+    LINK_DIR "${CMAKE_SOURCE_DIR}/data/explicit-NOTFOUND"
+  )
+else()
+  message(FATAL_ERROR "Unknown TEST_EXPLICIT_LINK_MODE: ${TEST_EXPLICIT_LINK_MODE}")
+endif()
+
+# Config-time resource with no LINK_DIR - content in cache only, no symlink.
+isaac_add_resource(res_config_no_link
+  URL "${TEST_FILE_URL}"
+  EXPECTED_HASH "${TEST_FILE_HASH}"
+  CONFIG_TIME
+)
+# Write exposed CONTENT_DIR so tests can assert its correctness.
+file(WRITE "${CMAKE_BINARY_DIR}/res_config_no_link_content_dir.txt" "${res_config_no_link_CONTENT_DIR}")
+
+if(TEST_ARCHIVE_KEEP_ARCHIVE)
+  set(_keep_archive_flag KEEP_ARCHIVE)
+else()
+  set(_keep_archive_flag "")
+endif()
+
+isaac_add_resource(res_archive
+  URL "${TEST_ARCHIVE_URL}"
+  EXPECTED_HASH "${TEST_ARCHIVE_HASH}"
+  STRIP_PREFIX "${TEST_ARCHIVE_STRIP_PREFIX}"
+  ${_keep_archive_flag}
+)
+
+if(TEST_FILTERED_ARCHIVE_URL AND TEST_FILTERED_ARCHIVE_HASH)
+  isaac_add_resource(res_filtered_archive
+    URL "${TEST_FILTERED_ARCHIVE_URL}"
+    EXPECTED_HASH "${TEST_FILTERED_ARCHIVE_HASH}"
+    STRIP_PREFIX "${TEST_FILTERED_ARCHIVE_STRIP_PREFIX}"
+    ARCHIVE_PATTERNS ${TEST_FILTERED_ARCHIVE_PATTERNS}
+  )
+  add_custom_target(all_resources
+    DEPENDS
+      res_archive
+      res_file
+      res_file_explicit
+      res_filtered_archive
+  )
+
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_patterns_a"
+    TARGET_NAME identity_patterns_a
+    URL "${TEST_FILTERED_ARCHIVE_URL}"
+    EXPECTED_HASH "${TEST_FILTERED_ARCHIVE_HASH}"
+    STRIP_PREFIX "${TEST_FILTERED_ARCHIVE_STRIP_PREFIX}"
+    ARCHIVE_PATTERNS "pkg/include/**" "pkg/lib/x86_64/libfoo*"
+    OUTPUT_CONTENT_ID _patterns_a_id
+  )
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_patterns_b"
+    TARGET_NAME identity_patterns_b
+    URL "${TEST_FILTERED_ARCHIVE_URL}"
+    EXPECTED_HASH "${TEST_FILTERED_ARCHIVE_HASH}"
+    STRIP_PREFIX "${TEST_FILTERED_ARCHIVE_STRIP_PREFIX}"
+    ARCHIVE_PATTERNS "pkg/lib/x86_64/libfoo*" "pkg/include/**"
+    OUTPUT_CONTENT_ID _patterns_b_id
+  )
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_patterns_c"
+    TARGET_NAME identity_patterns_c
+    URL "${TEST_FILTERED_ARCHIVE_URL}"
+    EXPECTED_HASH "${TEST_FILTERED_ARCHIVE_HASH}"
+    STRIP_PREFIX "${TEST_FILTERED_ARCHIVE_STRIP_PREFIX}"
+    ARCHIVE_PATTERNS "pkg/include/**"
+    OUTPUT_CONTENT_ID _patterns_c_id
+  )
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_keep_archive"
+    TARGET_NAME identity_keep_archive
+    URL "${TEST_FILTERED_ARCHIVE_URL}"
+    EXPECTED_HASH "${TEST_FILTERED_ARCHIVE_HASH}"
+    STRIP_PREFIX "${TEST_FILTERED_ARCHIVE_STRIP_PREFIX}"
+    ARCHIVE_PATTERNS "pkg/include/**" "pkg/lib/x86_64/libfoo*"
+    OUTPUT_CONTENT_ID _keep_archive_id
+  )
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_patch"
+    TARGET_NAME identity_patch
+    URL "${TEST_FILTERED_ARCHIVE_URL}"
+    EXPECTED_HASH "${TEST_FILTERED_ARCHIVE_HASH}"
+    STRIP_PREFIX "${TEST_FILTERED_ARCHIVE_STRIP_PREFIX}"
+    PATCH "${TEST_IDENTITY_PATCH}"
+    ARCHIVE_PATTERNS "pkg/include/**" "pkg/lib/x86_64/libfoo*"
+    OUTPUT_CONTENT_ID _patch_id
+  )
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_strip"
+    TARGET_NAME identity_strip
+    URL "${TEST_FILTERED_ARCHIVE_URL}"
+    EXPECTED_HASH "${TEST_FILTERED_ARCHIVE_HASH}"
+    STRIP_PREFIX "pkg/include"
+    ARCHIVE_PATTERNS "pkg/include/**" "pkg/lib/x86_64/libfoo*"
+    OUTPUT_CONTENT_ID _strip_id
+  )
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_file"
+    TARGET_NAME identity_file
+    URL "${TEST_FILE_URL}"
+    EXPECTED_HASH "${TEST_FILE_HASH}"
+    OUTPUT_CONTENT_DIR _file_dir
+    OUTPUT_CONTENT_ID _file_id
+  )
+  string(REGEX REPLACE "^[^=]+=" "" _bare_file_hash "${TEST_FILE_HASH}")
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_file"
+    TARGET_NAME identity_file
+    URL "${TEST_FILE_URL}"
+    EXPECTED_HASH "${_bare_file_hash}"
+    OUTPUT_CONTENT_DIR _bare_hash_dir
+    OUTPUT_CONTENT_ID _bare_hash_id
+  )
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_renamed_file"
+    TARGET_NAME identity_renamed_file
+    URL "${TEST_RENAMED_FILE_URL}"
+    EXPECTED_HASH "${TEST_FILE_HASH}"
+    OUTPUT_CONTENT_ID _renamed_file_id
+  )
+  string(TOUPPER "${TEST_FILE_HASH}" _uppercase_file_hash)
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_uppercase_hash"
+    TARGET_NAME identity_uppercase_hash
+    URL "${TEST_FILE_URL}"
+    EXPECTED_HASH "${_uppercase_file_hash}"
+    OUTPUT_CONTENT_ID _uppercase_hash_id
+  )
+  _isaac_resource_describe(
+    CACHE_DIR "${ISAAC_RESOURCE_CACHE}/identity_archive_as_file"
+    TARGET_NAME identity_archive_as_file
+    URL "${TEST_ARCHIVE_AS_FILE_URL}"
+    EXPECTED_HASH "${TEST_FILTERED_ARCHIVE_HASH}"
+    OUTPUT_CONTENT_ID _archive_as_file_id
+  )
+  file(WRITE "${CMAKE_BINARY_DIR}/resource_content_ids.txt"
+    "archive_as_file=${_archive_as_file_id}\n"
+    "bare_hash=${_bare_hash_id}\n"
+    "bare_hash_content_dir=${_bare_hash_dir}\n"
+    "file_content_dir=${_file_dir}\n"
+    "patterns_a=${_patterns_a_id}\n"
+    "patterns_b=${_patterns_b_id}\n"
+    "patterns_c=${_patterns_c_id}\n"
+    "keep_archive=${_keep_archive_id}\n"
+    "patch=${_patch_id}\n"
+    "strip=${_strip_id}\n"
+    "file=${_file_id}\n"
+    "renamed_file=${_renamed_file_id}\n"
+    "uppercase_hash=${_uppercase_hash_id}\n"
+  )
+else()
+  add_custom_target(all_resources DEPENDS res_archive res_file res_file_explicit)
+endif()
+
+get_target_property(_res_archive_content_dir res_archive ISAAC_RESOURCE_CONTENT_DIR)
+get_target_property(_res_archive_destination res_archive ISAAC_RESOURCE_DESTINATION)
+get_target_property(_res_archive_is_archive res_archive ISAAC_RESOURCE_IS_ARCHIVE)
+get_target_property(_res_file_content_dir res_file ISAAC_RESOURCE_CONTENT_DIR)
+get_target_property(_res_file_content_id res_file ISAAC_RESOURCE_CONTENT_ID)
+get_target_property(_res_file_destination res_file ISAAC_RESOURCE_DESTINATION)
+get_target_property(_res_file_is_archive res_file ISAAC_RESOURCE_IS_ARCHIVE)
+file(WRITE "${CMAKE_BINARY_DIR}/resource_target_properties.txt"
+  "archive_content_dir=${_res_archive_content_dir}\n"
+  "archive_destination=${_res_archive_destination}\n"
+  "archive_is_archive=${_res_archive_is_archive}\n"
+  "file_content_dir=${_res_file_content_dir}\n"
+  "file_content_id=${_res_file_content_id}\n"
+  "file_destination=${_res_file_destination}\n"
+  "file_is_archive=${_res_file_is_archive}\n"
+)
+
+# Variant resource used for cache-collision tests. Configured at configure time so
+# CONTENT_DIR is immediately observable via the written text file; STRIP_PREFIX and
+# ARCHIVE_PATTERNS are independently parameterized against a shared archive/hash.
+if(TEST_VARIANT_URL AND TEST_VARIANT_HASH)
+  isaac_add_resource(res_variant
+    URL "${TEST_VARIANT_URL}"
+    EXPECTED_HASH "${TEST_VARIANT_HASH}"
+    STRIP_PREFIX "${TEST_VARIANT_STRIP_PREFIX}"
+    ARCHIVE_PATTERNS ${TEST_VARIANT_PATTERNS}
+    CONFIG_TIME
+  )
+  file(WRITE "${CMAKE_BINARY_DIR}/res_variant_content_dir.txt"
+       "${res_variant_CONTENT_DIR}")
+endif()

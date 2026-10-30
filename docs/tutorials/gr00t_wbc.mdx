@@ -1,0 +1,30 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# GR00T N and whole-body control
+
+<Note>
+Deploy GR00T N1.7 ONNX models with G1 whole-body control and observe an
+apple-to-plate task.
+
+As of Isaac OS v0.11, only the bundled GR00T N1.7 models are supported. Other
+GR00T exports, including your own LEAPP exports, are not supported yet.
+</Note>
+
+Each path uses the bundled ONNX models for its deployment profile, which the build
+downloads. You do not need to export a checkpoint. Isaac OS loads ONNX models using
+its own YAML configuration; it does not ingest LEAPP metadata.
+
+| Tutorial | Starting artifact | Deployment |
+| --- | --- | --- |
+| [Simulation](/isaac-os/tutorials/gr00t-wbc/simulation) | Bundled static-apple ONNX models with a 40-step decoded action horizon | Supplied Isaac Sim apple scene on x86_64 |
+| [Real robot](/isaac-os/tutorials/gr00t-wbc/real-robot) | Bundled physical G1 ONNX models with a 16-step decoded action horizon | G1 with Dex3-1 hands and head camera, controlled from Thor |
+
+These are separate deployment paths with different exports. The simulation path
+uses the Isaac OS SIL scene; training and evaluation in Isaac Lab-Arena remain
+upstream. Success in SIL does not qualify a policy for the physical robot.
+
+For model compatibility, cached models and quick launch commands, see the
+[application reference](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1#model-export-contract).

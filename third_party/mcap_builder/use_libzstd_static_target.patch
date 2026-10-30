@@ -1,0 +1,13 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index d788aa7..739c3f5 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -19,7 +19,7 @@ endif()
+ find_package(zstd QUIET)
+ if (${zstd_FOUND})
+   message(STATUS "Found zstd from ${zstd_DIR}")
+-  list(APPEND DEPENDENCIES zstd::libzstd)
++  list(APPEND DEPENDENCIES zstd::libzstd_static)
+ else()
+   message(WARNING "Dependency zstd not found, disabling")
+   target_compile_definitions(mcap PUBLIC "MCAP_COMPRESSION_NO_ZSTD")

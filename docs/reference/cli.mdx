@@ -1,0 +1,117 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Isaac OS CLI
+
+<Note>
+Look up `./isaac_os` commands, modes, build options and argument forwarding.
+The wrapper configures the [Holoscan CLI](https://pypi.org/project/holoscan-cli/)
+for this repository's Docker, CMake, Ninja, CPM, [sccache](https://github.com/rapidsai/sccache)
+and CTest workflow.
+</Note>
+
+<Accordion title="Alternatives to the CLI and containers">
+
+- Use CMake and Docker directly. `--dryrun` shows the commands the CLI would use.
+- Build without containers if you provide the required toolchain and dependencies;
+  `--local` selects this path for CLI build, run and test commands.
+- Use another build system if it supplies the equivalent dependencies, generated
+  files and compiler/linker settings.
+
+</Accordion>
+
+## Requirements
+
+Run `./isaac_os` from the repository root. The default container workflow requires
+an accessible Docker daemon with the `nvidia` runtime and network access for CLI,
+image and dependency downloads. `--local` uses your provisioned host toolchain and
+dependencies instead of Docker.
+
+The wrapper uses `uv run` to launch `holoscan-cli` from the environment locked in
+`uv.lock`; the package pin lives in `pyproject.toml`. Without uv, it accepts a
+pre-installed `holoscan-cli` only if its version or Git commit matches that pin.
+
+See [Prerequisites](/isaac-os/how-to/build-and-run#prerequisites)
+for installation and checks, and
+[Supported platforms](/isaac-os/reference/platforms) for platform
+support and application constraints.
+
+## Commands
+
+| Command | Behavior |
+| --- | --- |
+| `./isaac_os list` | List discovered source projects; currently the repository exposes applications |
+| `./isaac_os modes <project>` | List the project's declared mode names and descriptions |
+| `./isaac_os build <project> [mode]` | Configure and build the project |
+| `./isaac_os run <project> [mode]` | Build and run the metadata-selected command; an omitted mode uses its default |
+| `./isaac_os test [project]` | Run the repository CTest script, optionally selecting a project |
+| `./isaac_os build-container` | Build the development image only |
+| `./isaac_os run-container [project] [mode]` | Open the development container; commands after `--` run inside it |
+| `./isaac_os clear-cache` | Clear build, data and install caches; `--build`, `--data`, `--install` restrict the selection; `--dryrun` previews it |
+| `./isaac_os env-info` / `env-check` / `status` | Inspect environment information, health checks or build status |
+| `./isaac_os version` | Show the resolved CLI package version |
+
+Use `./isaac_os --help` and `./isaac_os <command> --help` for the complete,
+version-specific lookup. Other exposed commands include `create`, `install`,
+`lint`, `package` and `setup`; their generic availability does not establish
+a validated Isaac OS external packaging workflow.
+
+See the [upstream CLI reference](https://github.com/nvidia-holoscan/holoscan-cli/blob/v5.0.0/CLI_REFERENCE.md)
+for the full command contract of the pinned Holoscan CLI 5.0.0.
+
+## Applications and mode names
+
+The CLI discovers applications through their `metadata.json` files. Use the
+metadata's `name`, which need not match the directory name. Some CLI commands
+also support non-executable projects, such as operators or libraries, if they
+provide metadata. Directories without metadata are not discoverable standalone
+projects; they can still be built as dependencies of a discovered application.
+
+**Modes are named presets for building or running a project.** They are
+application-specific and defined in its metadata. Use `sim` for Isaac Sim
+and `unitree_sim` for Unitree MuJoCo.
+
+See [mode semantics](/isaac-os/explanation/application-modes) and each
+application reference page for prerequisites and expected outcomes.
+
+For a component without project metadata, configure an application that enables
+it with `./isaac_os build <app_name> <mode>` before building its CMake target in
+that application's build directory. To run tests, use `test` directly:
+
+```bash
+./isaac_os run-container <app_name> <mode> -- cmake --build build/<app_name> --target <target> -j$(nproc)
+./isaac_os test <app_name> --ctest-options='-DTEST_FILTER=<regex>'
+```
+
+## Argument boundaries
+
+These examples show CMake options, mode lookup and application argument forwarding:
+
+```bash
+./isaac_os build so101_sinus_motion --configure-args='-DCMAKE_BUILD_TYPE=Release'
+./isaac_os modes so101_sinus_motion
+./isaac_os run so101_sinus_motion mock --no-docker-build -- --message-count=10
+./isaac_os run-container -- cmake --version
+```
+
+Tips:
+
+- CLI options precede `--`; executable arguments follow it. Use either `--run-args`
+  or trailing `--` for executable arguments; the wrapper rejects using both.
+- Repeat `--configure-args` for separate CMake definitions.
+- `run --no-local-build` skips the application build; `--no-docker-build` skips
+  the image build. These require existing, up-to-date artifacts.
+- `run --nsys-args='<options>'` enables Nsight Systems profiling and replaces its
+  default profiler options. Keep it before `--`, separate from application arguments.
+  See [Profile an Application](/isaac-os/how-to/profile-an-application) for NVTX capture settings.
+- `--dryrun` prints commands without executing them.
+
+## Wrapper defaults
+
+The image default is `isaac_os_build:latest`; the repository is mounted at
+`/workspace/isaac_os`. The wrapper defaults to Holoscan SDK `5.0.0`.
+`ISAAC_OS_EXTRA_DOCKER_BUILD_ARGS` and
+`ISAAC_OS_EXTRA_DOCKER_RUN_ARGS` extend the wrapper's arguments.
+Application metadata controls executable and working directory.

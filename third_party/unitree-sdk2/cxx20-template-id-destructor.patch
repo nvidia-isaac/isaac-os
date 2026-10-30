@@ -1,0 +1,52 @@
+diff --git a/thirdparty/include/ddscxx/dds/core/detail/ReferenceImpl.hpp b/thirdparty/include/ddscxx/dds/core/detail/ReferenceImpl.hpp
+index 3c3b0e2..af69532 100644
+--- a/thirdparty/include/ddscxx/dds/core/detail/ReferenceImpl.hpp
++++ b/thirdparty/include/ddscxx/dds/core/detail/ReferenceImpl.hpp
+@@ -60,7 +60,7 @@ dds::core::Reference<DELEGATE>::Reference(const DELEGATE_REF_T& p) : impl_(p)
+ }
+
+ template <typename DELEGATE>
+-dds::core::Reference<DELEGATE>::~Reference<DELEGATE>()
++dds::core::Reference<DELEGATE>::~Reference()
+ {
+ }
+
+diff --git a/thirdparty/include/ddscxx/dds/pub/detail/DataWriterImpl.hpp b/thirdparty/include/ddscxx/dds/pub/detail/DataWriterImpl.hpp
+index 12cdfbd..190a963 100644
+--- a/thirdparty/include/ddscxx/dds/pub/detail/DataWriterImpl.hpp
++++ b/thirdparty/include/ddscxx/dds/pub/detail/DataWriterImpl.hpp
+@@ -400,7 +400,7 @@ dds::pub::detail::DataWriter<T>::DataWriter(
+ }
+
+ template <typename T>
+-dds::pub::detail::DataWriter<T>::~DataWriter<T>()
++dds::pub::detail::DataWriter<T>::~DataWriter()
+ {
+     if (!this->closed) {
+         try {
+diff --git a/thirdparty/include/ddscxx/dds/sub/detail/TDataReaderImpl.hpp b/thirdparty/include/ddscxx/dds/sub/detail/TDataReaderImpl.hpp
+index 32385fd..ee45207 100644
+--- a/thirdparty/include/ddscxx/dds/sub/detail/TDataReaderImpl.hpp
++++ b/thirdparty/include/ddscxx/dds/sub/detail/TDataReaderImpl.hpp
+@@ -511,7 +511,7 @@ dds::sub::detail::DataReader<T>::common_constructor(
+ }
+
+ template <typename T>
+-dds::sub::detail::DataReader<T>::~DataReader<T>()
++dds::sub::detail::DataReader<T>::~DataReader()
+ {
+     if (!this->closed) {
+         try {
+diff --git a/thirdparty/include/ddscxx/dds/topic/detail/TTopicImpl.hpp b/thirdparty/include/ddscxx/dds/topic/detail/TTopicImpl.hpp
+index b080718..39b7291 100644
+--- a/thirdparty/include/ddscxx/dds/topic/detail/TTopicImpl.hpp
++++ b/thirdparty/include/ddscxx/dds/topic/detail/TTopicImpl.hpp
+@@ -209,7 +209,7 @@ dds::topic::detail::Topic<T>::Topic(const dds::domain::DomainParticipant& dp,
+
+
+ template <typename T>
+-dds::topic::detail::Topic<T>::~Topic<T>()
++dds::topic::detail::Topic<T>::~Topic()
+ {
+     if (!closed) {
+         try {

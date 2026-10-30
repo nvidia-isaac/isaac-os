@@ -1,0 +1,41 @@
+{
+  "application": {
+    "authors": [
+      {
+        "affiliation": "NVIDIA",
+        "name": "NVIDIA Corporation"
+      }
+    ],
+    "changelog": {},
+    "default_mode": "replay",
+    "description": "Minimal reference application for common/mcap_replayer: replays the topics of an mcap_logger_reference recording -- two isaac.JointStateCpu waveforms, an isaac.PoseCpu/TwistCpu/TransformCpu circular motion, an isaac.CameraInfoCpu, a tensor-schema holoscan.schema.Image counter stream, and the same counter recorded as hardware-encoded video when the host can decode it -- into a live graph at their recorded timing, and prints a replay summary on exit.",
+    "holoscan_sdk": {
+      "minimum_required_version": "5.0.0",
+      "tested_versions": [
+        "5.0.0"
+      ]
+    },
+    "language": "C++",
+    "modes": {
+      "replay": {
+        "description": "Replay a recording written by mcap_logger_reference. Pass --input-path=<file>; add --visualize to show the counter image streams in windows.",
+        "run": {
+          "command": "<isaac_app_bin>/mcap_replay_reference",
+          "workdir": "isaac_root"
+        }
+      }
+    },
+    "name": "mcap_replay_reference",
+    "platforms": [
+      "x86_64",
+      "aarch64"
+    ],
+    "ranking": 0,
+    "requirements": {},
+    "tags": [
+      "example",
+      "reference"
+    ],
+    "version": "0.1.0"
+  }
+}

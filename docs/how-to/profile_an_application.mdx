@@ -1,0 +1,266 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Profile an Application
+
+<Note>
+Capture a profile of your application and analyze its end-to-end latency and
+message rates.
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Profile an application" hidePrompt actions={["cursor"]}>
+Find the application, or existing profiling captures, in our conversation and
+project. Ask me for missing details.
+Follow the [profiling guide](/isaac-os/how-to/profile-an-application) and the
+[profiling skill](../../skills/data-flow-profiling/SKILL.md) to measure end-to-end
+latency and message rates. Use existing captures if they are sufficient. Report
+the measurement settings and the output files.
+</Prompt>
+</llms-ignore>
+
+Isaac OS applications can be profiled with
+[NVIDIA Nsight Systems](https://developer.nvidia.com/nsight-systems).
+
+The Holoscan SDK 5.0 [Nsight profiling annotations](https://docs.nvidia.com/holoscan/sdk-user-guide/5-0-latest/performance/nsight-profiling)
+use [NVTX](https://github.com/NVIDIA/NVTX) to trace operator execution (`compute`) and message
+transfers (`emit` and `receive`). These annotations enable end-to-end tracing of
+data flows through an application’s processing graph without any code changes.
+
+This guide shows how to capture those annotations and measure latency and message
+rates for each source-to-sink data flow in the graph using a custom Nsight Systems
+report (**`data_flow_tracking`**). Latency is measured from the source operator’s
+compute start to the sink operator’s compute end, including waits between operators.
+
+## Capture a profile
+
+Follow [Build and Run](/isaac-os/how-to/build-and-run) to prepare your application.
+
+From the repository root, run your application under Nsight Systems profiling by
+adding **`--nsys-args`** to the run command. The following nsys options enable
+low-overhead NVTX tracing to capture the annotations needed for the data-flow report:
+
+```bash
+mkdir -p build/benchmarks
+./isaac_os run <app_name> <mode> \
+  --nsys-args='--trace=nvtx --sample=none --backtrace=none --cpuctxsw=none --force-overwrite=true -o /workspace/isaac_os/build/benchmarks/profile'
+```
+
+`--nsys-args` enables profiling and replaces the complete default profiler option
+list:
+
+- `--trace=nvtx` captures NVTX annotations, including operator execution and message transfers.
+- `--sample=none` disables CPU sampling.
+- `--backtrace=none` disables call-stack collection.
+- `--cpuctxsw=none` disables CPU context-switch collection.
+- `--force-overwrite=true` allows replacing an existing capture.
+- `-o` sets the output prefix; the absolute container path saves into the mounted repository.
+
+Pass application arguments after `--` or through `--run-args`.
+
+Let the application run through startup and the measurement interval, then stop it
+normally. Wait for Nsight to finish writing `build/benchmarks/profile.nsys-rep`.
+Choose a different `-o` path for each run you want to keep.
+
+## Generate the Data Flow Report
+
+From the repository root on the host, open a shell in the development container:
+
+```bash
+./isaac_os run-container <app_name> <mode>
+```
+
+The shell starts in `/workspace/isaac_os`, with the repository mounted so you can
+access the capture and report scripts.
+
+Next, export the `nsys-rep` capture to SQLite **with binary payloads** to match
+emitted and received messages. This is required because the automatic export from
+`nsys stats` omits these payloads:
+
+```bash
+nsys export --type sqlite \
+  --include-blobs=true --force-overwrite=true \
+  -o <capture_path>.sqlite \
+  <capture_path>.nsys-rep
+```
+
+Then generate the report from the exported SQLite file:
+
+```bash
+nsys stats \
+  --report-dir tools/profiling \
+  --report data_flow_tracking \
+  --timeunit msec \
+  <capture_path>.sqlite
+```
+
+The report will print one row per reconstructed port path, with latency in milliseconds.
+
+### Customize the report
+
+The `data_flow_tracking` report supports additional options to control measurement
+and output. Append options to the report name as colon-separated `name=value`
+pairs, for example:
+
+```bash
+nsys stats \
+  --report-dir tools/profiling \
+  --report 'data_flow_tracking:option-a=x:option-b=y' \
+  --timeunit msec \
+  <capture_path>.sqlite
+```
+
+| Option | Description |
+| --- | --- |
+| `port-path=<path>` | Measure a specific port path, given as an exact `Port Path` string with `operator.port` labels separated by `->`, such as `source.out -> sink.in`. Preserve subgraph names and backslash escapes, and quote the entire `--report` argument. Omit both path options to report all paths. See [Measure a specific path](#measure-a-specific-path) below for examples. |
+| `port-path-file=<file>` | Measure a specific port path read from a UTF-8 file containing one exact `Port Path` on a single line, with `operator.port` labels separated by `->`. Relative filenames resolve from the working directory. Prefer this option for long paths or names containing `:` or `,`. See [Measure a specific path](#measure-a-specific-path) below for examples. |
+| `warmup=<N>` | Skip the first N source messages; default: `0`. |
+| `window=<N>` | Measure the next N source messages after warmup; omitted by default to use all remaining messages. |
+| `window-unit=ns` | Interpret `warmup` and `window` as nanoseconds instead of the default `messages`. Time starts at the callback that emitted the earliest traced source message across all paths. |
+| `responses=first` | Keep the earliest sink completion per source message on each path. The default, `all`, includes every captured response. |
+| `view=samples` | Print one row per selected response with message identity, source/sink timestamps and latency. The default, `summary`, prints per-path statistics. |
+| `latency-budget-ns=<N>` | Count selected responses whose latency exceeds N nanoseconds. Available in summary view. |
+| `expected-period-ns=<N>` | Report the P99.9 absolute sink interval error relative to an N-nanosecond period. Available in summary view. |
+
+#### Measure a specific path
+
+First, run `data_flow_tracking` without `port-path` or `port-path-file`, as shown
+in [Generate the Data Flow Report](#generate-the-data-flow-report), to list all
+reconstructed paths. Then copy the exact `Port Path` value from the row you want
+to measure. Paths use `operator.port` labels separated by `->`; `/` separates
+nested subgraph names.
+For a short path, set `port-path` directly, replacing this example with your path:
+
+```bash
+nsys stats \
+  --report-dir tools/profiling \
+  --report 'data_flow_tracking:port-path=source.out -> processor.in -> processor.out -> sink.in' \
+  --timeunit msec \
+  <capture_path>.sqlite
+```
+
+Keep the enclosing quotes to protect `->` and backslashes from the shell. For
+long paths or names containing `:` or `,`, use a file so Nsight does not interpret
+those characters as option separators. For example, this path passes through an
+operator in the `perception` subgraph:
+
+```bash
+cat > path.txt <<'EOF'
+source.out -> perception/processor.in -> perception/processor.out -> sink.in
+EOF
+
+nsys stats \
+  --report-dir tools/profiling \
+  --report 'data_flow_tracking:port-path-file=path.txt' \
+  --timeunit msec \
+  <capture_path>.sqlite
+```
+
+Replace the file contents with your exact path on one line, preserving spaces and
+backslashes. Use a filename without `:` or `,`, accessible from the container's
+working directory. Choose either `port-path` or `port-path-file`.
+
+Then combine path selection with measurement options as needed. For example, use
+`--report 'data_flow_tracking:port-path-file=path.txt:warmup=1000:window=20000:responses=first'`
+to skip 1,000 source messages and measure the next 20,000, keeping one response per
+message. The window limits source messages, not response rows; responses may finish
+after the window if they remain within the capture. Check `Eligible Sources` to
+confirm the measured message count.
+
+#### Output Formatting
+
+Use `--format csv` or `--format json` to choose the output format. To save the
+results, add `--output <output_prefix>`. For example,
+`--format json --output <output_prefix>` writes
+`<output_prefix>_data_flow_tracking.json`.
+
+Use `--timeunit nsec`, `usec`, `msec` or `sec` to set displayed time units. For raw
+sample timestamps, use `nsec`, the default. The period and latency-budget options
+always use nanoseconds, regardless of `--timeunit`.
+
+When saving a machine-readable report, also save stderr so trace-health warnings
+stay with the results:
+
+```bash
+nsys stats --report-dir tools/profiling --report data_flow_tracking \
+  --format json --timeunit msec --output <output_prefix> \
+  <capture_path>.sqlite 2> <output_prefix>.stderr
+```
+
+See the [data-flow report reference](../../tools/profiling/README.md) for column
+definitions, measurement boundaries, sample export commands and capture/report errors.
+
+### Example: GR00T image to joint command
+
+The [GR00T/WBC benchmark](/isaac-os/reference/applications/gr00t-n1-7-wbc-g1/benchmark#gr00t-image-to-command-path)
+defines the exact path from `mock_image_source.out_image` through GR00T inference,
+the action handler and command combiner to `mock_joint_command_sink.in_joint_command`.
+Use its capture and report commands to compare the image path with WBC over a common
+time window.
+
+With a 30 Hz image source and 5 Hz inference, many images will have no response on
+this path. Inspect eligible, matched, unmatched and selected counts alongside latency;
+unmatched images alone do not establish transport loss.
+
+## Plan a Benchmark Run
+
+### Choose the warmup and window
+
+- **Warmup:** Skip graph startup and any source messages sent before the pipeline produces
+  valid responses.
+- **Window:** Size it so the reported tail percentile rests on about 30 responses. For
+  p99.9, that is about 30,000 selected responses. On a path that responds to only some
+  source messages, scale the window by the response ratio.
+- **Trailing margin:** Run a few source messages past the window so the last window
+  responses complete before the run stops.
+- **Run length:** Set the application's message count and completion timeout to cover
+  warmup, window and margin.
+- **Budgets:** Set `latency-budget-ns` to a limit that matters to the application, such
+  as a period or a target expiry. Set `expected-period-ns` only on paths with a fixed
+  output period.
+
+### Repeat trials
+
+Close other GPU- and CPU-heavy work. Restart the application for each trial and write
+each trial to its own directory. Compare percentiles across trials. Maxima vary much
+more than percentiles, so treat the maximum as indicative.
+
+### Record conditions and artifacts
+
+A latency number is only useful with the conditions that produced it. On the host,
+record the date, Isaac OS commit, kernel and GPU:
+
+```bash
+{
+  date -u +%Y-%m-%dT%H:%M:%SZ
+  git rev-parse HEAD
+  git status --short
+  uname -r
+  nvidia-smi --query-gpu=name,driver_version --format=csv,noheader
+} > <trial_dir>/conditions.txt
+```
+
+Inside the container, record tool versions with `nsys --version` and hash each model the
+run loads with `sha256sum <model_path>` in `versions.txt`. Note other workloads yourself,
+because nothing in the capture records them.
+
+Keep these files from each trial directory:
+
+| File | Why keep it |
+| --- | --- |
+| `application.log` | Run summary and warnings |
+| `.nsys-rep` | The original capture; every statistic can be recomputed from it |
+| All-paths CSV | Every reconstructed path |
+| Path selector files | The exact `port-path-file` inputs |
+| Per-path report JSON | Measured statistics |
+| `*.stderr` | Report warnings |
+| `conditions.txt` and `versions.txt` | Version, host, GPU, tool and model details |
+
+## Next Steps
+
+See the [SO-101 sinus motion benchmark](/isaac-os/reference/applications/so101-sinus-motion/benchmark)
+for a worked example, [SO-101 Reach Part 4](/isaac-os/tutorials/so101-reach/benchmark)
+for a guided tutorial, or [Optimize an Application](/isaac-os/how-to/optimize-an-application)
+for diagnosis after capture.

@@ -1,0 +1,95 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Getting started
+
+<Note>
+Run a sample application without a robot or simulator. You will check your host,
+fetch the source code and run `so101_sinus_motion mock` to generate joint commands
+from synthetic states. This introduces the same build-and-run workflow used by the
+robot applications.
+</Note>
+
+## Check your host
+
+Ensure you have a host that meets the [platform requirements](/isaac-os/reference/platforms).
+AGX Thor with JetPack 7.2.1 is the formally supported deployment platform; x86_64 with NVIDIA
+GPU and AGX Orin on JetPack 7 are expected to support this mock workflow also.
+
+Check the tools needed to run the sample:
+
+```bash
+git --version
+docker info --format '{{json .Runtimes}}'
+uv --version
+```
+
+Git and uv should print their versions. Docker must work without `sudo` and list
+`nvidia` among its runtimes. If a command fails or `nvidia` is missing, complete the
+[Build and run prerequisites](/isaac-os/how-to/build-and-run#prerequisites), then return here.
+
+## Fetch the reference source code
+
+```bash
+git clone --branch <release_tag> https://github.com/nvidia-isaac/isaac-os.git
+cd isaac-os
+```
+
+
+
+## Run a sample app
+
+```bash
+./isaac_os run so101_sinus_motion mock -- --message-count=100
+```
+
+The first run downloads the container image and dependencies, then compiles the
+application. Later runs reuse the image, dependencies and build cache, so they start
+faster. This sample needs no policy model or TensorRT engine.
+
+### What to expect
+
+The application prints changing six-joint targets and stops after 100 completed
+commands. The synthetic state source, sine generator and motion planner produce
+those targets; no robot moves.
+
+<Accordion title="📄 Example output">
+
+With the default 100 Hz configuration, the log includes these messages. Prefixes,
+trace IDs, latencies and target values are omitted here:
+
+```text
+Waiting up to 13.0 s for 100 SO101 sinus commands.
+SO101 sinus mock command 10 received: ...
+SO101 sinus mock command 20 received: ...
+...
+SO101 sinus mock command 100 received: ...
+```
+
+</Accordion>
+
+## Next steps
+
+### Try another mode or application
+
+List applications and the modes of a selected application:
+
+```bash
+./isaac_os list
+./isaac_os modes so101_sinus_motion
+```
+
+Browse Controllers and Samples under Reference for application details,
+or try [SO-101 motion in Isaac Sim](/isaac-os/reference/applications/so101-sinus-motion#isaac-sim).
+
+### Choose what to learn next
+
+- **Tutorials:** deploy [SO-101 reach](/isaac-os/tutorials/so101-reach/deployment)
+  or explore [GR00T and whole-body control](/isaac-os/tutorials/gr00t-wbc).
+- **Explanation:** learn [Isaac OS concepts](/isaac-os/explanation/isaac-os-basics)
+  and [application modes](/isaac-os/explanation/application-modes).
+- **How-to guides:** [build and run applications](/isaac-os/how-to/build-and-run),
+  [profile an application](/isaac-os/how-to/profile-an-application), or
+  [integrate components in your project](/isaac-os/how-to/integrate-in-your-project).

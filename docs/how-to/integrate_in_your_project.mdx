@@ -1,0 +1,180 @@
+{/*
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/}
+
+# Integrate in your project
+
+<Note>
+
+This guide provides instructions to import some of the reusable components from the Isaac OS reference repository in your own repository with CMake.
+
+</Note>
+
+<llms-ignore>
+<Prompt title="✨ Agent prompt: Integrate Isaac OS components" hidePrompt actions={["cursor"]}>
+Find my project's build setup and the Isaac OS components it needs in our
+conversation and project. If it is not clear, ask me first if I want to reuse
+the Isaac OS Dockerfile and the Holoscan CLI, or keep my own environment and
+build tooling. Ask me for other missing details.
+Follow [Integrate in your project](/isaac-os/how-to/integrate-in-your-project).
+Use my project's CMake build, and verify that the selected targets compile and link.
+</Prompt>
+</llms-ignore>
+
+While the [Isaac OS repository](../..) currently serves as a hub for reference applications, some of the components in the repository can be reused for
+generic robotic development. CMake's `FetchContent` can be used to fetch and build selected components from source.
+
+<Launch>
+A package of reusable components named `holoscan-robotics` is planned for Q1 2027.
+</Launch>
+
+## Prepare the build environment
+
+Use a development environment with:
+
+- A C++20 compiler.
+- CMake 4.0 or newer. On Ubuntu, install it from the [Kitware APT repository](https://apt.kitware.com/).
+- CUDA 13 toolkit. On x86_64, install [CUDA 13.2](https://developer.nvidia.com/cuda-13-2-0-download-archive?target_os=Linux).
+  JetPack 7 already includes it.
+- [Holoscan SDK 5.0](https://docs.nvidia.com/holoscan/sdk-user-guide/5-0-latest/setup/sdk-installation) prebuilt.
+  Set `CMAKE_PREFIX_PATH` or `Holoscan_ROOT` to its installation prefix.
+- The dependencies of the components you select.
+- Network access for component dependencies not already installed or cached.
+
+To get these dependencies, you can:
+
+- Reuse the repository's [Dockerfile](../../Dockerfile), or read it and copy what you
+  need into your own image or host.
+- Start from an NVIDIA container image on [NGC](https://catalog.ngc.nvidia.com/containers),
+  for example CUDA, TensorRT or Holoscan.
+
+Use the build tooling of your choice. The [Isaac OS CLI](/isaac-os/reference/cli) is for
+the reference applications in the Isaac OS repository. In your own project, you can:
+
+- Use the [Holoscan CLI](https://pypi.org/project/holoscan-cli/) with your own
+  configuration or wrapper.
+- Keep your own tooling. To find what it needs, read the Isaac OS build files, or run
+  `./isaac_os` commands with `--dryrun` in the Isaac OS repository.
+
+<Tip>
+
+We recommend [Ninja](https://ninja-build.org/) and [Rapids-sccache](https://github.com/rapidsai/sccache) to speed up your C++ builds.
+
+</Tip>
+
+## Identify components to build
+
+Browse [Components](/isaac-os/reference/components) to choose an operator or library.
+Select components in CMake:
+
+1. **Operators**: under [operators/](../../operators).
+  Select operators by name with the `OP_<name>=ON` CMake configuration flag.
+2. **Libraries**: under [common/](../../common).
+  Select registered libraries by name with the `LIB_<name>=ON` CMake configuration flag.
+3. **Wire message schemas**: under [messages/](../../messages).
+  These are always configured, and build when a linked target requires them.
+
+<Note>
+
+These CMake flags names might differ from the CMake target name(s) built within that directory.
+Inspect the `CMakeLists.txt` file of the component of interest to identify the namespace.
+
+</Note>
+
+<Accordion title="📄 Examples">
+
+Setting `OP_mock=ON` enables the `operators/mock/` directory, which defines two
+link targets:
+
+- `isaac::operators::mock::joint_state` (concrete target `mock_joint_state_op`)
+- `isaac::operators::mock::sink` (concrete target `mock_sink_op`)
+
+After importing Isaac OS, link the target your application uses:
+
+```cmake
+target_link_libraries(my_app PRIVATE isaac::operators::mock::joint_state)
+```
+
+Building `my_app` also builds that operator and its dependencies. A default build
+without `--target` builds both enabled mock operators.
+
+---
+
+The example below uses `OP_camera_info` to select `operators/camera_info/` and
+links its `isaac::operators::camera_info` target.
+
+</Accordion>
+
+## Import the components
+
+Rely on CMake's [FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html)
+to fetch, build and configure the Isaac OS components you need in your own CMake project.
+
+The minimal example below shows in the `CMakeLists.txt` how the feature flags can be passed
+to select the components, how the imported CMake target is linked, and how its header is
+included in a C++ file:
+
+<CodeBlocks>
+
+```cmake title="CMakeLists.txt"
+cmake_minimum_required(VERSION 4.0)
+project(my_project LANGUAGES CXX)
+
+include(FetchContent)
+FetchContent_Declare(isaac_os
+  GIT_REPOSITORY https://github.com/nvidia-isaac/isaac-os.git
+  GIT_TAG "<commit_rev>"
+)
+
+function(import_isaac_os)
+  set(ISAAC_BUILD_TESTS OFF)
+  set(OP_camera_info ON)
+  FetchContent_MakeAvailable(isaac_os)
+endfunction()
+
+import_isaac_os()
+
+add_executable(my_app main.cc)
+target_compile_features(my_app PRIVATE cxx_std_20)
+target_link_libraries(my_app PRIVATE isaac::operators::camera_info)
+```
+
+```cpp title="main.cc"
+#include "operators/camera_info/camera_info_op.h"
+
+int main() {
+  isaac::os::ops::CameraInfoOp op;
+  static_cast<void>(op.contract());
+  return 0;
+}
+```
+
+</CodeBlocks>
+
+<Info>
+
+The function scopes the normal variables, but automatically enabled dependencies
+remain in the shared CMake cache after their parent component is disabled.
+Reconfiguring applies your changes; a fresh build directory also resets those
+cached dependency selections.
+
+</Info>
+
+The options at the top of the Isaac OS root [`CMakeLists.txt`](../../CMakeLists.txt)
+configure the build. Some of them have defaults that depend on what the host system
+provides. Set them in `import_isaac_os()` or with `-D` on the configure command line
+to fit your needs.
+
+From that source directory, configuring, building, and running, would be done with:
+
+```bash
+cmake -S . -B build # -G Ninja
+cmake --build build
+./build/my_app
+```
+
+<Info>
+To use Isaac OS with a coding agent in your project, give your agent the
+[For agents](/isaac-os/for-agents) page.
+</Info>

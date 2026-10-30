@@ -1,0 +1,44 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+// Test-only representation of the isaac.Tensor schema removed in favor of
+// Holoscan's canonical tensor.fbs. Keep this fixture frozen to verify that old
+// payloads remain readable; it is not part of the production schema package.
+namespace legacy;
+
+enum DLDataTypeCode : uint8 {
+  kDLInt = 0,
+  kDLUInt = 1,
+  kDLFloat = 2,
+  kDLBfloat = 4,
+}
+
+enum DLDeviceType : int32 {
+  kDLUnknown = 0,
+  kDLCPU = 1,
+  kDLCUDA = 2,
+  kDLCUDAHost = 3,
+  kDLCUDAManaged = 13,
+}
+
+struct DLDataType {
+  code: DLDataTypeCode;
+  bits: uint8;
+  lanes: uint16;
+}
+
+struct DLDevice {
+  device_type: DLDeviceType;
+  device_id: int32;
+}
+
+table Tensor {
+  data: [ubyte] (id: 0);
+  shape: [int64] (id: 1);
+  dtype: DLDataType (id: 2);
+  device: DLDevice (id: 3);
+  ndim: uint32 (id: 4);
+  strides: [int64] (id: 5);
+}
+
+root_type Tensor;

@@ -1,0 +1,222 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# CTest entry point for `./isaac_os test`.
+
+cmake_minimum_required(VERSION 4.0)
+
+if(NOT DEFINED WORKSPACE_NAME)
+  set(WORKSPACE_NAME "$ENV{HOLOSCAN_CLI_WORKSPACE_NAME}")
+endif()
+if(NOT WORKSPACE_NAME)
+  set(WORKSPACE_NAME "isaac_os")
+endif()
+if(NOT TAG)
+  set(TAG "latest")
+endif()
+if(NOT PLATFORM_NAME)
+  set(PLATFORM_NAME "linux")
+endif()
+
+set(_default_source "/workspace/${WORKSPACE_NAME}")
+get_filename_component(_script_source "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+if(EXISTS "${_script_source}/CMakeLists.txt")
+  set(_default_source "${_script_source}")
+endif()
+if(DEFINED ENV{HOLOSCAN_CLI_ROOT})
+  set(_host_workspace "$ENV{HOLOSCAN_CLI_ROOT}")
+  if(_host_workspace AND EXISTS "${_host_workspace}/CMakeLists.txt")
+    set(_default_source "${_host_workspace}")
+  endif()
+endif()
+if(NOT DEFINED CTEST_SOURCE_DIRECTORY)
+  set(CTEST_SOURCE_DIRECTORY "${_default_source}")
+endif()
+set(CTEST_BINARY_DIRECTORY "${CTEST_SOURCE_DIRECTORY}/build/all")
+set(CTEST_CMAKE_GENERATOR "Ninja")
+
+# Resolve the optional selective target supplied by holoscan-cli.
+set(_target_kind "")
+set(_target_name "")
+foreach(_kind APP LIB OP)
+  if(DEFINED ${_kind} AND NOT "${${_kind}}" STREQUAL "")
+    if(_target_kind)
+      message(FATAL_ERROR "APP, LIB, and OP are mutually exclusive")
+    endif()
+    set(_target_kind "${_kind}")
+    set(_target_name "${${_kind}}")
+  endif()
+endforeach()
+
+foreach(_option IN LISTS CONFIGURE_OPTIONS)
+  if(_option MATCHES "^-B($|[ =])")
+    message(FATAL_ERROR
+      "The test runner owns the CMake binary directory; remove '${_option}'."
+    )
+  endif()
+endforeach()
+
+if(TEST_ONLY)
+  set(_mode "TEST_ONLY")
+elseif(CONFIGURE_ONLY)
+  set(_mode "CONFIGURE_ONLY")
+elseif(BUILD_ONLY)
+  set(_mode "BUILD_ONLY")
+else()
+  set(_mode "FULL")
+endif()
+
+find_program(SCCACHE_PROGRAM sccache)
+set(_sccache_enabled FALSE)
+if(SCCACHE_PROGRAM AND
+   DEFINED ENV{HOLOSCAN_CLI_ENABLE_SCCACHE} AND
+   "$ENV{HOLOSCAN_CLI_ENABLE_SCCACHE}" STREQUAL "ON")
+  set(_sccache_enabled TRUE)
+endif()
+
+function(isaac_run_holoscan_graph)
+  set(_build_subdir "$ENV{HOLOSCAN_CLI_BUILD_SUBDIR}")
+  if(NOT _build_subdir)
+    set(_build_subdir "build/all")
+  endif()
+
+  set(CTEST_BINARY_DIRECTORY "${CTEST_SOURCE_DIRECTORY}/${_build_subdir}")
+  if(_target_kind)
+    string(TOLOWER "${_target_kind}" _kind_lower)
+    set(CTEST_BUILD_NAME
+      "isaac_os-${PLATFORM_NAME}-${_kind_lower}-${_target_name}-${TAG}"
+    )
+    set(_target "${_target_kind}_${_target_name}")
+  else()
+    set(CTEST_BUILD_NAME "isaac_os-${PLATFORM_NAME}-all-${TAG}")
+    set(_target "BUILD_ALL")
+  endif()
+
+  set(configure_options
+    -DCMAKE_BUILD_TYPE=Release
+    -UAPP_*
+    -UEXT_*
+    -ULIB_*
+    -UOP_*
+  )
+  list(APPEND configure_options ${CONFIGURE_OPTIONS})
+  if(_target_kind)
+    list(APPEND configure_options
+      -DBUILD_ALL=OFF
+      "-D${_target_kind}_${_target_name}=ON"
+    )
+  else()
+    list(APPEND configure_options -DBUILD_ALL=ON)
+  endif()
+
+  if(DEFINED ENV{ISAAC_ENABLE_NV_VIDEO_SDK})
+    list(APPEND configure_options
+      "-DISAAC_ENABLE_NV_VIDEO_SDK=$ENV{ISAAC_ENABLE_NV_VIDEO_SDK}"
+    )
+  endif()
+
+  if(_sccache_enabled)
+    list(APPEND configure_options
+      "-DCMAKE_C_COMPILER_LAUNCHER=${SCCACHE_PROGRAM}"
+      "-DCMAKE_CUDA_COMPILER_LAUNCHER=${SCCACHE_PROGRAM}"
+      "-DCMAKE_CXX_COMPILER_LAUNCHER=${SCCACHE_PROGRAM}"
+    )
+  endif()
+
+  if(COVERAGE)
+    set(CTEST_CUSTOM_COVERAGE_EXCLUDE ".*/_deps/.*")
+    list(APPEND configure_options
+      -DCMAKE_C_FLAGS=--coverage
+      -DCMAKE_CXX_FLAGS=--coverage
+      -DCMAKE_EXE_LINKER_FLAGS=--coverage
+      -DCMAKE_SHARED_LINKER_FLAGS=--coverage
+    )
+  endif()
+
+  message(
+    "isaac_os.ctest :: mode=${_mode} sdk=5 "
+    "target=${_target} build=${_build_subdir} tag=${TAG}"
+  )
+
+  set(config_result 0)
+  set(build_result 0)
+  set(test_result 0)
+  ctest_start(Experimental)
+
+  if(NOT TEST_ONLY)
+    ctest_configure(OPTIONS "${configure_options}" RETURN_VALUE config_result)
+    if(NOT CONFIGURE_ONLY AND NOT config_result)
+      ctest_build(RETURN_VALUE build_result)
+    endif()
+  endif()
+
+  if(_sccache_enabled)
+    set(_sccache_stats "${CTEST_BINARY_DIRECTORY}/sccache-stats.txt")
+    execute_process(
+      COMMAND "${SCCACHE_PROGRAM}" --show-stats
+      ERROR_FILE "${_sccache_stats}"
+      OUTPUT_FILE "${_sccache_stats}"
+      RESULT_VARIABLE _sccache_status
+    )
+    if(_sccache_status)
+      message(WARNING "sccache --show-stats failed with code ${_sccache_status}.")
+    endif()
+  endif()
+
+  if(NOT BUILD_ONLY AND NOT CONFIGURE_ONLY AND NOT config_result AND NOT build_result)
+    set(ctest_test_args RETURN_VALUE test_result)
+    if(TEST_FILTER)
+      list(APPEND ctest_test_args INCLUDE "${TEST_FILTER}")
+    endif()
+    if(TEST_EXCLUDE)
+      list(APPEND ctest_test_args EXCLUDE "${TEST_EXCLUDE}")
+    endif()
+    if(TEST_LABEL_REGEX)
+      list(APPEND ctest_test_args INCLUDE_LABEL "${TEST_LABEL_REGEX}")
+    endif()
+    if(TEST_LABEL_EXCLUDE)
+      list(APPEND ctest_test_args EXCLUDE_LABEL "${TEST_LABEL_EXCLUDE}")
+    endif()
+    if(JUNIT_FILE)
+      if(IS_ABSOLUTE "${JUNIT_FILE}")
+        set(_junit_file "${JUNIT_FILE}")
+      else()
+        set(_junit_file "${CTEST_SOURCE_DIRECTORY}/${JUNIT_FILE}")
+      endif()
+      list(APPEND ctest_test_args OUTPUT_JUNIT "${_junit_file}")
+    endif()
+    ctest_test(${ctest_test_args})
+  endif()
+
+  if(COVERAGE AND NOT config_result AND NOT build_result)
+    execute_process(
+      COMMAND coverage xml -o "${CTEST_BINARY_DIRECTORY}/coverage.xml"
+      WORKING_DIRECTORY "${CTEST_BINARY_DIRECTORY}"
+    )
+    set(CTEST_COVERAGE_COMMAND "/usr/bin/gcov")
+    ctest_coverage()
+  endif()
+
+  if(CTEST_SUBMIT_URL)
+    ctest_submit()
+  endif()
+
+  message(
+    "Return values: "
+    "config=${config_result} build=${build_result} test=${test_result}"
+  )
+  if(config_result OR build_result OR test_result)
+    set(_failures
+      "config=${config_result}, build=${build_result}, test=${test_result}"
+      PARENT_SCOPE
+    )
+  endif()
+endfunction()
+
+set(_failures)
+isaac_run_holoscan_graph()
+
+if(_failures)
+  message(FATAL_ERROR "Isaac OS test graph failures:\n${_failures}")
+endif()
+message("Isaac OS ${_mode} completed successfully.")

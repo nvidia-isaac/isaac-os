@@ -1,0 +1,101 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Resort this file with `yq eval -i '.repos |= sort_by(.repo)' .pre-commit-config.yaml`
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.12.24
+    hooks:
+      - id: uv-lock
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.2
+    hooks:
+      - id: codespell
+        exclude: '^docs/fern/dist/|package-lock\.json$|uv\.lock$|pyproject\.toml$'
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.21.0
+    hooks:
+      - id: yamlfmt
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.49.0
+    hooks:
+      - id: markdownlint
+        language_version: 22.20.0
+        args: ['--fix']
+        exclude: '^.agents/.*'
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v22.1.5
+    hooks:
+      - id: clang-format
+        exclude: '^docs/fern/dist/'
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - types-markdown
+          - types-pyyaml
+          - types-requests
+          - types-docutils
+        args: [--ignore-missing-imports, --explicit-package-bases]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-json
+      - id: check-xml
+      - id: check-ast
+      - id: double-quote-string-fixer
+      - id: end-of-file-fixer
+        exclude: '\.patch$'
+      - id: pretty-format-json
+        args: ['--autofix']
+        exclude: 'package-lock\.json$'
+      - id: trailing-whitespace
+        exclude: '\.patch$'
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, release]
+  - repo: https://github.com/pylint-dev/pylint
+    rev: v4.0.6
+    hooks:
+      - id: pylint
+  - repo: local
+    hooks:
+      - id: check-application-docs-sync
+        name: check generated Fern pages match application Markdown
+        entry: python3 docs/scripts/sync_application_pages.py --check
+        language: python
+        additional_dependencies: [PyYAML~=6.0]
+        pass_filenames: false
+        files: >-
+          ^(applications/(.*/)?(README|BENCHMARK|RESULTS)\.md|docs/applications/.*\.mdx|docs/fern/.*\.ya?ml|docs/scripts/(sync_application_pages|check_doc_links)\.py|\.pre-commit-config\.yaml)$
+      - id: check-markdown-links
+        name: check repository Markdown links
+        entry: python3 docs/scripts/check_doc_links.py --local-files-only
+        language: python
+        additional_dependencies: [PyYAML~=6.0]
+        pass_filenames: false
+        files: '(\.mdx?$|^docs/scripts/(tests/test_)?check_doc_links\.py$|^\.pre-commit-config\.yaml$)'
+      - id: license-header-check
+        name: run license-check script
+        entry: ./tools/lint/license_check.py
+        language: python
+        pass_filenames: true
+        exclude: '^(internal)/.*'
+      - id: directory-check
+        name: directory-check
+        entry: ./tools/lint/directory_check.py
+        language: python
+        pass_filenames: true
+      - id: check-gr00t-spelling
+        name: check-gr00t-spelling
+        entry: ./tools/lint/check_gr00t_spelling.py
+        language: python
+        pass_filenames: true
+        exclude: tools/lint/check_gr00t_spelling\.py
+        types_or: [python, c, c++, yaml, json, markdown, text]
+

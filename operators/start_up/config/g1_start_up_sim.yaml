@@ -1,0 +1,72 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Simulation start-up routine for the Unitree G1 (StartUpOp), loaded via the `config_file` path in
+# the application's `sim_start_up` block. It reproduces what the simulator is already doing rather
+# than imposing a routine: the pose and gains below are the USD drive targets and drive gains from
+# operators/unitree_g1/assets/g1_ucx.usda, with the arm overrides from g1_static_apple_ucx.usda
+# layered on top. So startup holds the spawn pose at the spawn gains and hands over to the WBC
+# without moving the robot, which is what the sim did before StartUpOp was composed here. The
+# arm-clearance waypoints and stiffer hold gains in g1_start_up.yaml exist to protect real hardware.
+#
+# USD angular drives are per-degree, so every value here is the USD number times 180/pi. Keep them
+# in step with the scene: if the USD changes, the robot will twitch at startup instead of holding.
+
+control_dt: 0.02 # 50 Hz pipeline; the durations below convert to steps
+
+# The simulator's own drive gains, so engaging StartUpOp does not change joint stiffness.
+kp: &sim_kp
+  '.*': 100.0 # hips, shoulder pitch/roll (USD 1.74533 per-degree)
+  '.*_knee_joint': 200.0
+  '.*_ankle_.*': 20.0
+  'waist_.*': 300.0
+  '.*_shoulder_yaw_joint': 40.0
+  '.*_elbow_joint': 40.0
+  '.*_wrist_.*': 20.0
+  '.*_hand_.*': 1.0 # no USD drive; light hold so the hands settle at 0.0
+kd: &sim_kd
+  '.*': 2.5 # hips
+  '.*_knee_joint': 5.0
+  '.*_ankle_pitch_joint': 0.2
+  '.*_ankle_roll_joint': 0.1
+  'waist_.*': 5.0
+  '.*_shoulder_.*': 5.0
+  '.*_shoulder_yaw_joint': 2.0
+  '.*_elbow_joint': 2.0
+  '.*_wrist_.*': 2.0
+  '.*_hand_.*': 0.1 # no USD drive
+
+# Same gains once the final pose is reached: the sim needs no stiffening to hold a stance.
+hold_kp: *sim_kp
+hold_kd: *sim_kd
+
+dwell_duration: 0.1 # min hold before the settle check; short because the sim spawns stable
+# A hand interpenetrating scene geometry makes the solver report a steady ~0.8 rad/s on those
+# joints while their positions hold to within 1e-6 rad, so the hardware threshold of 0.5 is never
+# met. The magnitude depends on penetration depth, so treat this as a floor to clear, not a tuned
+# value: if startup stops handing over, check for a phased-in hand before raising it again.
+vel_settled_threshold: 1.0 # max joint velocity (rad/s) that counts as settled
+
+waypoints:
+  # The sim's spawn pose, held rather than moved to. The legs are asymmetric in the USD, so each
+  # joint is listed instead of matched by regex.
+  - name: sim_spawn_pose
+    duration: 0.5
+    joint_positions:
+      '.*': 0.0
+      'left_hip_pitch_joint': -0.4597 # -26.338927 deg
+      'left_hip_roll_joint': 0.1529 # 8.761470 deg
+      'left_hip_yaw_joint': -0.0315 # -1.806966 deg
+      'left_knee_joint': 0.8853 # 50.721633 deg
+      'left_ankle_pitch_joint': -0.4589 # -26.295468 deg
+      'left_ankle_roll_joint': -0.1213 # -6.949692 deg
+      'right_hip_pitch_joint': -0.4438 # -25.425317 deg
+      'right_hip_roll_joint': -0.1650 # -9.451340 deg
+      'right_hip_yaw_joint': 0.0250 # 1.431678 deg
+      'right_knee_joint': 0.8829 # 50.584954 deg
+      'right_ankle_pitch_joint': -0.4711 # -26.991526 deg
+      'right_ankle_roll_joint': 0.1096 # 6.278615 deg
+      'left_shoulder_roll_joint': 0.2500 # 14.32394488 deg
+      'left_shoulder_yaw_joint': 0.5000 # 28.64788976 deg
+      'right_shoulder_roll_joint': -0.2500 # -14.32394488 deg
+      'right_shoulder_yaw_joint': -0.5000 # -28.64788976 deg

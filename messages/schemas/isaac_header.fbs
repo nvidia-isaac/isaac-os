@@ -1,0 +1,25 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+include "isaac_time.fbs";
+
+namespace isaac;
+
+// Header message. Mirrors holoscan.schema.Header on the wire.
+table Header {
+  // Deprecated. New producers must write capture_timestamp_ns instead. Kept
+  // in the schema so legacy peers that still populate only this field remain
+  // decodable via the fallback in wire_codec.cc::header_timestamp.
+  stamp: Time (id: 0);
+
+  // The frame id of the header.
+  frame_id: string (id: 1);
+
+  // Measurement time in nanoseconds (clock domain out of band). Zero is
+  // treated as absent so the reader falls back to `stamp`; this matches
+  // the SDK's holoscan.schema.Header, whose capture_timestamp_ns is a
+  // plain int64 with the same "0 == absent" convention.
+  capture_timestamp_ns: int64 (id: 2);
+}
+
+root_type Header;
